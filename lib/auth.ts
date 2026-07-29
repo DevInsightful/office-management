@@ -101,7 +101,6 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   const row = rows[0];
 
   if (!row) {
-    cookieStore.delete(SESSION_COOKIE);
     return null;
   }
 

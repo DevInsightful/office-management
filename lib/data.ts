@@ -25,6 +25,7 @@ export type DashboardData = {
       category: string;
       amount: number;
       entry_date: string;
+      created_at: string;
       notes: string;
     }[];
     incomeByCategory: { category: string; total: number }[];
@@ -193,9 +194,10 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
         category: string;
         amount: string;
         entry_date: string;
+        created_at: string;
         notes: string;
       }[]>`
-        select id, type, title, category, amount::text, entry_date::text, notes
+        select id, type, title, category, amount::text, entry_date::text, created_at::text, notes
         from finance_entries
         order by entry_date desc, id desc
       `,
@@ -453,6 +455,7 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
         category: string;
         amount: string;
         entry_date: string;
+        created_at: string;
         notes: string;
       }) => ({
         ...row,

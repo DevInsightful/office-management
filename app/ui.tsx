@@ -68,11 +68,11 @@ export function LoginScreen({ error }: { error: string | null }) {
             <LoginSubmitButton />
           </form>
 
-          <div className="mt-8 space-y-3">
+          {/* <div className="mt-8 space-y-3">
             <SeedCredential title="Super admin" email="superadmin@office.local" password="superadmin123" />
             <SeedCredential title="Admin" email="admin@office.local" password="admin123" />
             <SeedCredential title="Employee" email="employee@office.local" password="employee123" />
-          </div>
+          </div> */}
         </section>
       </div>
     </div>

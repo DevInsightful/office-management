@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import {
+  deleteFinanceEntryAction,
+  deleteUserAction,
   markSalaryPaidAction,
   startTaskTimerAction,
   stopTaskTimerAction,
@@ -102,6 +104,7 @@ type FinanceEntry = {
   category: string;
   amount: number;
   entry_date: string;
+  created_at: string;
   notes: string;
 };
 
@@ -308,7 +311,9 @@ export function FinanceLedgerClient({
                 <th className="pb-3 pr-4 font-medium"><SortButton label="Title" active={sort === "title"} direction={direction} onClick={() => toggleSort("title")} /></th>
                 <th className="pb-3 pr-4 font-medium"><SortButton label="Category" active={sort === "category"} direction={direction} onClick={() => toggleSort("category")} /></th>
                 <th className="pb-3 pr-4 font-medium"><SortButton label="Date" active={sort === "entry_date"} direction={direction} onClick={() => toggleSort("entry_date")} /></th>
-                <th className="pb-3 font-medium"><SortButton label="Amount" active={sort === "amount"} direction={direction} onClick={() => toggleSort("amount")} /></th>
+                <th className="pb-3 pr-4 font-medium">Created</th>
+                <th className="pb-3 pr-4 font-medium"><SortButton label="Amount" active={sort === "amount"} direction={direction} onClick={() => toggleSort("amount")} /></th>
+                <th className="pb-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -327,12 +332,32 @@ export function FinanceLedgerClient({
                     <td className="py-3 pr-4">{entry.title}</td>
                     <td className="py-3 pr-4 text-slate-600">{entry.category}</td>
                     <td className="py-3 pr-4 text-slate-600">{entry.entry_date}</td>
-                    <td className="py-3 font-semibold">{currency(entry.amount)}</td>
+                    <td className="py-3 pr-4 text-slate-600">{new Date(entry.created_at).toLocaleString()}</td>
+                    <td className="py-3 pr-4 font-semibold">{currency(entry.amount)}</td>
+                    <td className="py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={`/dashboard/finance?modal=edit-entry&entry=${entry.id}`}
+                          className="inline-flex rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
+                        >
+                          Edit
+                        </Link>
+                        <form action={deleteFinanceEntryAction}>
+                          <input type="hidden" name="entryId" value={entry.id} />
+                          <PendingSubmitButton
+                            idleLabel="Delete"
+                            pendingLabel="Deleting..."
+                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+                            pendingClassName="cursor-not-allowed bg-rose-50 text-rose-400 hover:bg-rose-50"
+                          />
+                        </form>
+                      </div>
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-500">
+                  <td colSpan={7} className="py-8 text-center text-slate-500">
                     No finance entries match the current filters.
                   </td>
                 </tr>
@@ -352,9 +377,17 @@ type EmployeeRow = {
   role: "super_admin" | "admin" | "employee";
   joinedOn: string;
   salary: number;
+  active: boolean;
+  createdAt: string;
 };
 
-export function EmployeesDirectoryClient({ employees }: { employees: EmployeeRow[] }) {
+export function EmployeesDirectoryClient({
+  employees,
+  canManageAdmins,
+}: {
+  employees: EmployeeRow[];
+  canManageAdmins: boolean;
+}) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"fullName" | "email" | "role" | "joinedOn" | "salary">("fullName");
   const [direction, setDirection] = useState<SortDirection>("asc");
@@ -401,7 +434,9 @@ export function EmployeesDirectoryClient({ employees }: { employees: EmployeeRow
                 <th className="pb-3 pr-4 font-medium"><SortButton label="Email" active={sort === "email"} direction={direction} onClick={() => toggleSort("email")} /></th>
                 <th className="pb-3 pr-4 font-medium"><SortButton label="Role" active={sort === "role"} direction={direction} onClick={() => toggleSort("role")} /></th>
                 <th className="pb-3 pr-4 font-medium"><SortButton label="Joined" active={sort === "joinedOn"} direction={direction} onClick={() => toggleSort("joinedOn")} /></th>
-                <th className="pb-3 font-medium"><SortButton label="Salary" active={sort === "salary"} direction={direction} onClick={() => toggleSort("salary")} /></th>
+                <th className="pb-3 pr-4 font-medium"><SortButton label="Salary" active={sort === "salary"} direction={direction} onClick={() => toggleSort("salary")} /></th>
+                <th className="pb-3 pr-4 font-medium">Created</th>
+                <th className="pb-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -411,7 +446,31 @@ export function EmployeesDirectoryClient({ employees }: { employees: EmployeeRow
                   <td className="py-3 pr-4 text-slate-600">{employee.email}</td>
                   <td className="py-3 pr-4 text-slate-600">{employee.role.replace("_", " ")}</td>
                   <td className="py-3 pr-4 text-slate-600">{employee.joinedOn}</td>
-                  <td className="py-3 font-semibold">{currency(employee.salary)}</td>
+                  <td className="py-3 pr-4 font-semibold">{currency(employee.salary)}</td>
+                  <td className="py-3 pr-4 text-slate-600">{new Date(employee.createdAt).toLocaleDateString()}</td>
+                  <td className="py-3">
+                    {employee.role === "super_admin" || (!canManageAdmins && employee.role === "admin") ? (
+                      <span className="text-sm text-slate-400">-</span>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={`/dashboard/employees?modal=edit-user&user=${employee.id}`}
+                          className="inline-flex rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
+                        >
+                          Edit
+                        </Link>
+                        <form action={deleteUserAction}>
+                          <input type="hidden" name="userId" value={employee.id} />
+                          <PendingSubmitButton
+                            idleLabel="Delete"
+                            pendingLabel="Deleting..."
+                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+                            pendingClassName="cursor-not-allowed bg-rose-50 text-rose-400 hover:bg-rose-50"
+                          />
+                        </form>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -433,6 +492,7 @@ type OrderRow = {
   total: number;
   status: string;
   imageUrl: string;
+  createdAt: string;
 };
 
 export function OrdersTableClient({
@@ -521,7 +581,9 @@ export function OrdersTableClient({
                 <th className="w-[12%] pb-3 pr-3 font-medium"><SortButton label="Delivery" active={sort === "deliveryDate"} direction={direction} onClick={() => toggleSort("deliveryDate")} /></th>
                 <th className="w-[10%] pb-3 pr-3 font-medium"><SortButton label="Total" active={sort === "total"} direction={direction} onClick={() => toggleSort("total")} /></th>
                 <th className="w-[12%] pb-3 pr-3 font-medium"><SortButton label="Status" active={sort === "status"} direction={direction} onClick={() => toggleSort("status")} /></th>
-                <th className="w-[8%] pb-3 font-medium">Image</th>
+                <th className="w-[10%] pb-3 pr-3 font-medium">Created</th>
+                <th className="w-[8%] pb-3 pr-3 font-medium">Image</th>
+                <th className="w-[10%] pb-3 font-medium">Edit</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -578,7 +640,8 @@ export function OrdersTableClient({
                       <Badge>{order.status}</Badge>
                     )}
                   </td>
-                  <td className="py-3">
+                  <td className="py-3 pr-3 text-slate-600">{new Date(order.createdAt).toLocaleDateString()}</td>
+                  <td className="py-3 pr-3">
                     <Link
                       href={order.imageUrl}
                       target="_blank"
@@ -586,6 +649,14 @@ export function OrdersTableClient({
                       className="inline-flex rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
                     >
                       View
+                    </Link>
+                  </td>
+                  <td className="py-3" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                    <Link
+                      href={`/dashboard/orders?modal=edit-order&order=${order.id}`}
+                      className="inline-flex rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
+                    >
+                      Edit
                     </Link>
                   </td>
                 </tr>

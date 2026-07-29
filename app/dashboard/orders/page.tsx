@@ -1,6 +1,8 @@
+import { createOrderAction, deleteOrderAction, updateOrderAction } from "@/app/actions";
 import { OrdersTableClient } from "@/app/dashboard/client-tables";
 import { OrderForm } from "@/app/dashboard/order-form";
 import { OrderCopyButton } from "@/app/dashboard/order-copy-button";
+import { PendingSubmitButton } from "@/app/pending-controls";
 import { ActionLink, MetricCard, ModalFrame, PageIntro, currency } from "@/app/ui";
 import { requireUser } from "@/lib/auth";
 import { getOrdersData } from "@/lib/orders";
@@ -48,7 +50,12 @@ export default async function OrdersPage({
           subtitle={`CSR will be ${user.fullName}. All fields are required except description.`}
           closeHref="/dashboard/orders"
         >
-          <OrderForm today={today} />
+          <OrderForm
+            today={today}
+            action={createOrderAction}
+            submitLabel="Create order"
+            pendingLabel="Creating order..."
+          />
         </ModalFrame>
       )}
 
@@ -58,8 +65,18 @@ export default async function OrdersPage({
           subtitle="Full order details and image preview."
           closeHref="/dashboard/orders"
         >
-          <div className="mb-4 flex justify-end">
+          <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
             <OrderCopyButton order={selectedOrder} />
+            <ActionLink href={`/dashboard/orders?modal=edit-order&order=${selectedOrder.id}`} label="Edit Order" />
+            <form action={deleteOrderAction}>
+              <input type="hidden" name="orderId" value={selectedOrder.id} />
+              <PendingSubmitButton
+                idleLabel="Delete Order"
+                pendingLabel="Deleting..."
+                className="inline-flex items-center justify-center gap-3 rounded-2xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50"
+                pendingClassName="cursor-not-allowed bg-rose-50 text-rose-400 hover:bg-rose-50"
+              />
+            </form>
           </div>
           <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
@@ -90,6 +107,40 @@ export default async function OrdersPage({
               />
             </div>
           </div>
+        </ModalFrame>
+      )}
+
+      {modal === "edit-order" && selectedOrder && (
+        <ModalFrame
+          title={`Edit Order #${selectedOrder.id}`}
+          subtitle="Update the order details. Image stays unchanged during edit."
+          closeHref={`/dashboard/orders?modal=details&order=${selectedOrder.id}`}
+        >
+          <OrderForm
+            today={today}
+            action={updateOrderAction}
+            submitLabel="Update order"
+            pendingLabel="Updating order..."
+            requireImage={false}
+            initialValues={{
+              id: selectedOrder.id,
+              note: selectedOrder.note,
+              idName: selectedOrder.idName,
+              bookingDate: selectedOrder.bookingDate,
+              deliveryDate: selectedOrder.deliveryDate,
+              customerName: selectedOrder.customerName,
+              address: selectedOrder.address,
+              phoneNumber: selectedOrder.phoneNumber,
+              orderDetails: selectedOrder.orderDetails,
+              color: selectedOrder.color,
+              price: selectedOrder.price,
+              freeDelivery: selectedOrder.freeDelivery,
+              deliveryPrice: selectedOrder.deliveryPrice,
+              freeParking: selectedOrder.freeParking,
+              paymentMethod: selectedOrder.paymentMethod,
+              description: selectedOrder.description,
+            }}
+          />
         </ModalFrame>
       )}
     </>

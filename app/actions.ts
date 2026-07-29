@@ -108,6 +108,112 @@ export async function createUserAction(formData: FormData) {
   `;
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/employees");
+  redirect("/dashboard/employees");
+}
+
+export async function updateUserAction(formData: FormData) {
+  const actor = await requireAdmin();
+
+  const userId = cleanNumber(formData.get("userId"));
+  const role = cleanText(formData.get("role"));
+  const fullName = cleanText(formData.get("fullName"));
+  const email = cleanText(formData.get("email")).toLowerCase();
+  const password = cleanText(formData.get("password"));
+  const joinedOn = cleanDate(formData.get("joinedOn"));
+  const salary = cleanNumber(formData.get("salary"));
+
+  if (!userId || !fullName || !email || !["admin", "employee"].includes(role)) {
+    redirect("/dashboard/employees?error=invalid_user_fields");
+  }
+
+  const users = await sql<{ id: number; role: "super_admin" | "admin" | "employee" }[]>`
+    select id, role
+    from users
+    where id = ${userId}
+    limit 1
+  `;
+
+  const target = users[0];
+
+  if (!target || target.role === "super_admin") {
+    redirect("/dashboard/employees?error=invalid_user_target");
+  }
+
+  if (actor.role !== "super_admin" && (role !== "employee" || target.role !== "employee")) {
+    redirect("/dashboard/employees?error=forbidden");
+  }
+
+  if (role === "admin" && actor.role !== "super_admin") {
+    redirect("/dashboard/employees?error=forbidden");
+  }
+
+  if (password) {
+    const passwordHash = await hashPassword(password);
+
+    await sql`
+      update users
+      set
+        role = ${role},
+        full_name = ${fullName},
+        email = ${email},
+        password_hash = ${passwordHash},
+        joined_on = ${joinedOn},
+        salary = ${salary}
+      where id = ${userId}
+    `;
+  } else {
+    await sql`
+      update users
+      set
+        role = ${role},
+        full_name = ${fullName},
+        email = ${email},
+        joined_on = ${joinedOn},
+        salary = ${salary}
+      where id = ${userId}
+    `;
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/employees");
+  redirect("/dashboard/employees");
+}
+
+export async function deleteUserAction(formData: FormData) {
+  const actor = await requireAdmin();
+  const userId = cleanNumber(formData.get("userId"));
+
+  if (!userId || userId === actor.id) {
+    redirect("/dashboard/employees?error=invalid_delete_target");
+  }
+
+  const users = await sql<{ id: number; role: "super_admin" | "admin" | "employee" }[]>`
+    select id, role
+    from users
+    where id = ${userId}
+    limit 1
+  `;
+
+  const target = users[0];
+
+  if (!target || target.role === "super_admin") {
+    redirect("/dashboard/employees?error=invalid_delete_target");
+  }
+
+  if (actor.role !== "super_admin" && target.role !== "employee") {
+    redirect("/dashboard/employees?error=forbidden");
+  }
+
+  await sql`delete from users where id = ${userId}`;
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/employees");
+  revalidatePath("/dashboard/orders");
+  revalidatePath("/dashboard/tasks");
+  revalidatePath("/dashboard/payroll");
+  revalidatePath("/dashboard/performance");
+  redirect("/dashboard/employees");
 }
 
 export async function addFinanceEntryAction(formData: FormData) {
@@ -130,6 +236,55 @@ export async function addFinanceEntryAction(formData: FormData) {
   `;
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/finance");
+  redirect("/dashboard/finance");
+}
+
+export async function updateFinanceEntryAction(formData: FormData) {
+  await requireAdmin();
+
+  const entryId = cleanNumber(formData.get("entryId"));
+  const type = cleanText(formData.get("type"));
+  const title = cleanText(formData.get("title"));
+  const category = cleanText(formData.get("category"));
+  const amount = cleanNumber(formData.get("amount"));
+  const entryDate = cleanDate(formData.get("entryDate"));
+  const notes = cleanText(formData.get("notes"));
+
+  if (!entryId || !title || !category || !amount || !["income", "expense"].includes(type)) {
+    redirect("/dashboard/finance?error=invalid_finance_entry");
+  }
+
+  await sql`
+    update finance_entries
+    set
+      type = ${type},
+      title = ${title},
+      category = ${category},
+      amount = ${amount},
+      entry_date = ${entryDate},
+      notes = ${notes}
+    where id = ${entryId}
+  `;
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/finance");
+  redirect("/dashboard/finance");
+}
+
+export async function deleteFinanceEntryAction(formData: FormData) {
+  await requireAdmin();
+  const entryId = cleanNumber(formData.get("entryId"));
+
+  if (!entryId) {
+    redirect("/dashboard/finance?error=invalid_finance_entry");
+  }
+
+  await sql`delete from finance_entries where id = ${entryId}`;
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/finance");
+  redirect("/dashboard/finance");
 }
 
 export async function markAttendanceAction(formData: FormData) {
@@ -454,6 +609,7 @@ export async function createOrderAction(formData: FormData) {
       color,
       price,
       free_delivery,
+      delivery_price,
       free_parking,
       total,
       payment_method,
@@ -505,4 +661,116 @@ export async function updateOrderStatusAction(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/orders");
+}
+
+export async function updateOrderAction(formData: FormData) {
+  const actor = await requireUser();
+
+  const orderId = cleanNumber(formData.get("orderId"));
+  const note = cleanText(formData.get("note"));
+  const idName = cleanText(formData.get("idName"));
+  const bookingDate = cleanDate(formData.get("bookingDate"));
+  const deliveryDate = cleanDate(formData.get("deliveryDate"));
+  const customerName = cleanText(formData.get("customerName"));
+  const address = cleanText(formData.get("address"));
+  const phoneNumber = cleanText(formData.get("phoneNumber"));
+  const orderDetails = cleanText(formData.get("orderDetails"));
+  const color = cleanText(formData.get("color"));
+  const price = cleanNumber(formData.get("price"));
+  const deliveryMode = cleanText(formData.get("deliveryMode"));
+  const freeDelivery = cleanBoolean(formData.get("freeDelivery"));
+  const deliveryPrice = cleanNumber(formData.get("deliveryPrice"));
+  const freeParking = cleanBoolean(formData.get("freeParking"));
+  const paymentMethod = cleanText(formData.get("paymentMethod"));
+  const description = cleanText(formData.get("description"));
+  const normalizedFreeDelivery = deliveryMode === "paid" ? false : freeDelivery || deliveryMode === "free";
+  const normalizedDeliveryPrice = normalizedFreeDelivery ? 0 : deliveryPrice;
+  const total = price + normalizedDeliveryPrice;
+
+  if (
+    !orderId ||
+    !note ||
+    !idName ||
+    !bookingDate ||
+    !deliveryDate ||
+    !customerName ||
+    !address ||
+    !phoneNumber ||
+    !orderDetails ||
+    !color ||
+    !price ||
+    !paymentMethod ||
+    !["free", "paid"].includes(deliveryMode) ||
+    (!normalizedFreeDelivery && normalizedDeliveryPrice <= 0)
+  ) {
+    redirect(`/dashboard/orders?modal=edit-order&order=${orderId}&error=invalid_order`);
+  }
+
+  const rows = await sql<{ csr_user_id: number }[]>`
+    select csr_user_id
+    from orders
+    where id = ${orderId}
+    limit 1
+  `;
+
+  const order = rows[0];
+
+  if (!order || (actor.role === "employee" && order.csr_user_id !== actor.id)) {
+    redirect("/dashboard/orders?error=forbidden");
+  }
+
+  await sql`
+    update orders
+    set
+      note = ${note},
+      id_name = ${idName},
+      booking_date = ${bookingDate},
+      delivery_date = ${deliveryDate},
+      customer_name = ${customerName},
+      address = ${address},
+      phone_number = ${phoneNumber},
+      order_details = ${orderDetails},
+      color = ${color},
+      price = ${price},
+      free_delivery = ${normalizedFreeDelivery},
+      delivery_price = ${normalizedDeliveryPrice},
+      free_parking = ${freeParking},
+      total = ${total},
+      payment_method = ${paymentMethod},
+      description = ${description},
+      updated_at = now()
+    where id = ${orderId}
+  `;
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/orders");
+  redirect(`/dashboard/orders?modal=details&order=${orderId}`);
+}
+
+export async function deleteOrderAction(formData: FormData) {
+  const actor = await requireUser();
+  const orderId = cleanNumber(formData.get("orderId"));
+
+  if (!orderId) {
+    redirect("/dashboard/orders?error=invalid_order");
+  }
+
+  const rows = await sql<{ csr_user_id: number }[]>`
+    select csr_user_id
+    from orders
+    where id = ${orderId}
+    limit 1
+  `;
+
+  const order = rows[0];
+
+  if (!order || (actor.role === "employee" && order.csr_user_id !== actor.id)) {
+    redirect("/dashboard/orders?error=forbidden");
+  }
+
+  await sql`delete from orders where id = ${orderId}`;
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/orders");
+  redirect("/dashboard/orders");
 }
