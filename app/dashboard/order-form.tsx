@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { createOrderAction } from "@/app/actions";
+import { PendingSubmitButton } from "@/app/pending-controls";
 import { Field, inputClass, primaryButton, textareaClass } from "@/app/ui";
 
 export function OrderForm({ today }: { today: string }) {
@@ -120,7 +121,12 @@ export function OrderForm({ today }: { today: string }) {
       <Field label="Description (Optional)">
         <textarea name="description" rows={3} className={textareaClass} placeholder="Optional extra notes" />
       </Field>
-      <button className={primaryButton}>Create order</button>
+      <PendingSubmitButton
+        idleLabel="Create order"
+        pendingLabel="Creating order..."
+        className={`${primaryButton} gap-3`}
+        pendingClassName="cursor-not-allowed bg-slate-700 hover:bg-slate-700"
+      />
     </form>
   );
 }

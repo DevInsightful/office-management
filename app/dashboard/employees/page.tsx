@@ -1,9 +1,11 @@
 import { createUserAction } from "@/app/actions";
-import { ActionLink, Field, ModalFrame, PageIntro, Panel, currency, inputClass, primaryButton } from "@/app/ui";
+import { EmployeesDirectoryClient } from "@/app/dashboard/client-tables";
+import { PendingSubmitButton } from "@/app/pending-controls";
+import { ActionLink, Field, ModalFrame, PageIntro, inputClass, primaryButton } from "@/app/ui";
 import { requireAdmin } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
 
-const today = "2026-07-28";
+const today = "2026-07-29";
 
 export default async function EmployeesPage({
   searchParams,
@@ -24,34 +26,7 @@ export default async function EmployeesPage({
         action={<ActionLink href="/dashboard/employees?modal=create-user" label="Create Employee" />}
       />
 
-      <section className="grid gap-4">
-        <Panel title="All Team Members" subtitle="Roles, join dates, and fixed monthly salaries.">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="text-left text-slate-500">
-                <tr>
-                  <th className="pb-3 pr-4 font-medium">Name</th>
-                  <th className="pb-3 pr-4 font-medium">Email</th>
-                  <th className="pb-3 pr-4 font-medium">Role</th>
-                  <th className="pb-3 pr-4 font-medium">Joined</th>
-                  <th className="pb-3 font-medium">Salary</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {data.employees.map((employee) => (
-                  <tr key={employee.id}>
-                    <td className="py-3 pr-4 font-medium text-slate-900">{employee.fullName}</td>
-                    <td className="py-3 pr-4 text-slate-600">{employee.email}</td>
-                    <td className="py-3 pr-4 text-slate-600">{employee.role.replace("_", " ")}</td>
-                    <td className="py-3 pr-4 text-slate-600">{employee.joinedOn}</td>
-                    <td className="py-3 font-semibold">{currency(employee.salary)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
-      </section>
+      <EmployeesDirectoryClient employees={data.employees} />
 
       {modal === "create-user" && (
         <ModalFrame
@@ -83,13 +58,18 @@ export default async function EmployeesPage({
             </Field>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Joined on">
-                <input name="joinedOn" type="date" defaultValue={today} className={inputClass} />
+                <input name="joinedOn" type="date" defaultValue={today} max={today} className={inputClass} />
               </Field>
               <Field label="Monthly salary">
                 <input name="salary" type="number" min="0" step="0.01" placeholder="85000" className={inputClass} />
               </Field>
             </div>
-            <button className={primaryButton}>Create user</button>
+            <PendingSubmitButton
+              idleLabel="Create user"
+              pendingLabel="Creating user..."
+              className={`${primaryButton} gap-3`}
+              pendingClassName="cursor-not-allowed bg-slate-700 hover:bg-slate-700"
+            />
           </form>
         </ModalFrame>
       )}

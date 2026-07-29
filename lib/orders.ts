@@ -39,8 +39,8 @@ type OrderRow = {
 export type OrdersData = {
   metrics: {
     totalOrders: number;
-    totalValue: number;
-    deliveredOrders: number;
+    completedOrders: number;
+    approvedOrders: number;
     pendingOrders: number;
   };
   orders: {
@@ -167,8 +167,8 @@ export async function getOrdersData(user: SessionUser): Promise<OrdersData> {
   return {
     metrics: {
       totalOrders: orders.length,
-      totalValue: orders.reduce((sum: number, order: OrderItem) => sum + order.total, 0),
-      deliveredOrders: orders.filter((order: OrderItem) => order.status === "delivered").length,
+      completedOrders: orders.filter((order: OrderItem) => order.status === "delivered").length,
+      approvedOrders: orders.filter((order: OrderItem) => order.status === "approved").length,
       pendingOrders: orders.filter((order: OrderItem) => order.status === "pending").length,
     },
     orders,

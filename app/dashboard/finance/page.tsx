@@ -1,19 +1,11 @@
-import {
-  ActionLink,
-  Field,
-  ModalFrame,
-  PageIntro,
-  Panel,
-  currency,
-  inputClass,
-  primaryButton,
-  textareaClass,
-} from "@/app/ui";
+import { addFinanceEntryAction } from "@/app/actions";
+import { FinanceLedgerClient } from "@/app/dashboard/client-tables";
+import { PendingSubmitButton } from "@/app/pending-controls";
+import { ActionLink, Field, ModalFrame, PageIntro, inputClass, primaryButton, textareaClass } from "@/app/ui";
 import { requireAdmin } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
-import { addFinanceEntryAction } from "@/app/actions";
 
-const today = "2026-07-28";
+const today = "2026-07-29";
 
 export default async function FinancePage({
   searchParams,
@@ -34,44 +26,7 @@ export default async function FinancePage({
         action={<ActionLink href="/dashboard/finance?modal=new-entry" label="New Expense / Income" />}
       />
 
-      <section className="grid gap-4">
-        <Panel title="All Finance Entries" subtitle="Latest office income and expenses.">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="text-left text-slate-500">
-                <tr>
-                  <th className="pb-3 pr-4 font-medium">Type</th>
-                  <th className="pb-3 pr-4 font-medium">Title</th>
-                  <th className="pb-3 pr-4 font-medium">Category</th>
-                  <th className="pb-3 pr-4 font-medium">Date</th>
-                  <th className="pb-3 font-medium">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {data.finance.recent.map((entry) => (
-                  <tr key={entry.id}>
-                    <td className="py-3 pr-4">
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] ${
-                          entry.type === "income"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-rose-100 text-rose-700"
-                        }`}
-                      >
-                        {entry.type}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-4">{entry.title}</td>
-                    <td className="py-3 pr-4 text-slate-600">{entry.category}</td>
-                    <td className="py-3 pr-4 text-slate-600">{entry.entry_date}</td>
-                    <td className="py-3 font-semibold">{currency(entry.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
-      </section>
+      <FinanceLedgerClient entries={data.finance.recent} today={today} />
 
       {modal === "new-entry" && (
         <ModalFrame
@@ -98,12 +53,17 @@ export default async function FinancePage({
               </Field>
             </div>
             <Field label="Entry date">
-              <input name="entryDate" type="date" defaultValue={today} className={inputClass} />
+              <input name="entryDate" type="date" defaultValue={today} max={today} className={inputClass} />
             </Field>
             <Field label="Notes">
               <textarea name="notes" rows={4} className={textareaClass} placeholder="Optional details" />
             </Field>
-            <button className={primaryButton}>Save finance entry</button>
+            <PendingSubmitButton
+              idleLabel="Save finance entry"
+              pendingLabel="Saving entry..."
+              className={`${primaryButton} gap-3`}
+              pendingClassName="cursor-not-allowed bg-slate-700 hover:bg-slate-700"
+            />
           </form>
         </ModalFrame>
       )}

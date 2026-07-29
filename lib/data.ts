@@ -198,7 +198,6 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
         select id, type, title, category, amount::text, entry_date::text, notes
         from finance_entries
         order by entry_date desc, id desc
-        limit 10
       `,
     ]);
 

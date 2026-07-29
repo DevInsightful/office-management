@@ -1,6 +1,7 @@
 import { logoutAction } from "@/app/actions";
 import { NavLink } from "@/app/dashboard/nav-link";
 import { SidebarShell } from "@/app/dashboard/sidebar-shell";
+import { PendingSubmitButton } from "@/app/pending-controls";
 import { MissingConfigScreen } from "@/app/ui";
 import { requireUser } from "@/lib/auth";
 import { seedIfEmpty } from "@/lib/seed";
@@ -58,9 +59,12 @@ export default async function DashboardLayout({
               ))}
             </nav>
             <form action={logoutAction} className="mt-5">
-              <button className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
-                Logout
-              </button>
+              <PendingSubmitButton
+                idleLabel="Logout"
+                pendingLabel="Logging out..."
+                className="inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                pendingClassName="cursor-not-allowed bg-slate-100 text-slate-500 hover:bg-slate-100"
+              />
             </form>
           </div>
         }

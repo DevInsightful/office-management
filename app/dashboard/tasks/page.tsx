@@ -1,13 +1,6 @@
-import Link from "next/link";
-
-import {
-  addTaskLogAction,
-  createTaskAction,
-  startTaskTimerAction,
-  stopTaskTimerAction,
-  updateTaskStatusAction,
-} from "@/app/actions";
-import { LiveTaskTimer } from "@/app/dashboard/live-task-timer";
+import { addTaskLogAction, createTaskAction, startTaskTimerAction, stopTaskTimerAction, updateTaskStatusAction } from "@/app/actions";
+import { TasksBoardClient } from "@/app/dashboard/client-tables";
+import { PendingSubmitButton } from "@/app/pending-controls";
 import {
   ActionLink,
   Badge,
@@ -36,9 +29,7 @@ export default async function TasksPage({
   const modal = params?.modal;
   const selectedTaskId = Number(params?.task ?? data.tasks[0]?.id ?? 0);
   const selectedTask = data.tasks.find((task) => task.id === selectedTaskId) ?? data.tasks[0] ?? null;
-  const selectedTaskLogs = selectedTask
-    ? data.taskLogs.filter((log) => log.task_id === selectedTask.id)
-    : [];
+  const selectedTaskLogs = selectedTask ? data.taskLogs.filter((log) => log.task_id === selectedTask.id) : [];
 
   return (
     <>
@@ -49,100 +40,8 @@ export default async function TasksPage({
         action={canAssign ? <ActionLink href="/dashboard/tasks?modal=assign-task" label="Assign Task" /> : undefined}
       />
 
-      <section className="grid gap-4">
-        <Panel title="Task Board" subtitle="Table view for all tasks with quick status and timer actions.">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="text-left text-slate-500">
-                <tr>
-                  <th className="pb-3 pr-4 font-medium">Task</th>
-                  <th className="pb-3 pr-4 font-medium">Employee</th>
-                  <th className="pb-3 pr-4 font-medium">Priority</th>
-                  <th className="pb-3 pr-4 font-medium">Status</th>
-                  <th className="pb-3 pr-4 font-medium">Time</th>
-                  <th className="pb-3 pr-4 font-medium">Timer</th>
-                  <th className="pb-3 pr-4 font-medium">Quick status</th>
-                  <th className="pb-3 font-medium">Details</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {data.tasks.map((task) => {
-                  const detailsHref = `/dashboard/tasks?modal=task-details&task=${task.id}`;
-
-                  return (
-                    <tr key={task.id} className={task.id === selectedTask?.id ? "bg-amber-50/50" : ""}>
-                      <td className="py-3 pr-4">
-                        <div>
-                          <p className="font-medium text-slate-900">{task.title}</p>
-                          <p className="mt-1 max-w-xs truncate text-xs text-slate-500">{task.details}</p>
-                        </div>
-                      </td>
-                      <td className="py-3 pr-4 text-slate-600">{task.employee_name}</td>
-                      <td className="py-3 pr-4">
-                        <PriorityBadge priority={task.priority} />
-                      </td>
-                      <td className="py-3 pr-4">
-                        <Badge>{task.status}</Badge>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-slate-700">{task.timer_total_minutes} min logged</p>
-                          <LiveTaskTimer startedAt={task.timer_started_at} />
-                        </div>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <div className="flex gap-2">
-                          <form action={startTaskTimerAction}>
-                            <input type="hidden" name="taskId" value={task.id} />
-                            <button
-                              className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                                task.timer_started_at
-                                  ? "border border-emerald-200 bg-emerald-600 text-white hover:bg-emerald-500"
-                                  : "border border-slate-200 text-slate-900 hover:bg-slate-50"
-                              }`}
-                            >
-                              Start
-                            </button>
-                          </form>
-                          <form action={stopTaskTimerAction}>
-                            <input type="hidden" name="taskId" value={task.id} />
-                            <input type="hidden" name="description" value="Timer session recorded from task table." />
-                            <button className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-50">
-                              Stop
-                            </button>
-                          </form>
-                        </div>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <form action={updateTaskStatusAction} className="flex items-center gap-2">
-                          <input type="hidden" name="taskId" value={task.id} />
-                          <input type="hidden" name="description" value="" />
-                          <input type="hidden" name="minutesSpent" value="0" />
-                          <select name="status" defaultValue={task.status} className="min-w-[130px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-amber-400">
-                            <option value="pending">Pending</option>
-                            <option value="working">Working</option>
-                            <option value="completed">Completed</option>
-                          </select>
-                          <button className="rounded-xl bg-slate-950 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800">
-                            Save
-                          </button>
-                        </form>
-                      </td>
-                      <td className="py-3">
-                        <Link
-                          href={detailsHref}
-                          className="inline-flex rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
-                        >
-                          Open
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
+      <section className="grid gap-4 overflow-x-hidden">
+        <TasksBoardClient tasks={data.tasks} />
 
         <Panel title="Recent Work Logs" subtitle="Proof of work and time spent on tasks.">
           <div className="overflow-x-auto">
@@ -203,7 +102,12 @@ export default async function TasksPage({
                 <option value="high">High</option>
               </select>
             </Field>
-            <button className={primaryButton}>Assign task</button>
+            <PendingSubmitButton
+              idleLabel="Assign task"
+              pendingLabel="Assigning task..."
+              className={`${primaryButton} gap-3`}
+              pendingClassName="cursor-not-allowed bg-slate-700 hover:bg-slate-700"
+            />
           </form>
         </ModalFrame>
       )}
@@ -250,7 +154,12 @@ export default async function TasksPage({
                 <Field label="Manual minutes">
                   <input name="minutesSpent" type="number" min="0" defaultValue={0} className={inputClass} />
                 </Field>
-                <button className={primaryButton}>Save status</button>
+                <PendingSubmitButton
+                  idleLabel="Save status"
+                  pendingLabel="Saving status..."
+                  className={`${primaryButton} gap-3`}
+                  pendingClassName="cursor-not-allowed bg-slate-700 hover:bg-slate-700"
+                />
               </form>
             </div>
 
@@ -258,7 +167,12 @@ export default async function TasksPage({
               <div className="grid gap-3 sm:grid-cols-2">
                 <form action={startTaskTimerAction}>
                   <input type="hidden" name="taskId" value={selectedTask.id} />
-                  <button className={secondaryButton}>Start timer</button>
+                  <PendingSubmitButton
+                    idleLabel="Start timer"
+                    pendingLabel="Starting timer..."
+                    className={`${secondaryButton} gap-3`}
+                    pendingClassName="cursor-not-allowed bg-slate-100 text-slate-500 hover:bg-slate-100"
+                  />
                 </form>
                 <form action={stopTaskTimerAction} className="space-y-3">
                   <input type="hidden" name="taskId" value={selectedTask.id} />
@@ -267,7 +181,12 @@ export default async function TasksPage({
                     placeholder="What was done in this session?"
                     className={inputClass}
                   />
-                  <button className={secondaryButton}>Stop timer</button>
+                  <PendingSubmitButton
+                    idleLabel="Stop timer"
+                    pendingLabel="Stopping timer..."
+                    className={`${secondaryButton} gap-3`}
+                    pendingClassName="cursor-not-allowed bg-slate-100 text-slate-500 hover:bg-slate-100"
+                  />
                 </form>
               </div>
 
@@ -284,7 +203,12 @@ export default async function TasksPage({
                 <Field label="Minutes spent">
                   <input name="minutesSpent" type="number" min="0" defaultValue={30} className={inputClass} />
                 </Field>
-                <button className={primaryButton}>Add work log</button>
+                <PendingSubmitButton
+                  idleLabel="Add work log"
+                  pendingLabel="Saving work log..."
+                  className={`${primaryButton} gap-3`}
+                  pendingClassName="cursor-not-allowed bg-slate-700 hover:bg-slate-700"
+                />
               </form>
 
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">

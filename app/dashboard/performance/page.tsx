@@ -1,3 +1,4 @@
+import { PerformanceTableClient } from "@/app/dashboard/client-tables";
 import { PageIntro, Panel } from "@/app/ui";
 import { requireUser } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
@@ -15,35 +16,7 @@ export default async function PerformancePage() {
       />
 
       <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-        <Panel
-          title={user.role === "employee" ? "My Performance" : "Team Performance"}
-          subtitle="Attendance, completed work, and logged time by employee."
-        >
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="text-left text-slate-500">
-                <tr>
-                  <th className="pb-3 pr-4 font-medium">Employee</th>
-                  <th className="pb-3 pr-4 font-medium">Attendance</th>
-                  <th className="pb-3 pr-4 font-medium">Completed</th>
-                  <th className="pb-3 pr-4 font-medium">Active</th>
-                  <th className="pb-3 font-medium">Minutes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {data.performance.map((row) => (
-                  <tr key={row.id}>
-                    <td className="py-3 pr-4 font-medium">{row.fullName}</td>
-                    <td className="py-3 pr-4">{row.attendanceCount}</td>
-                    <td className="py-3 pr-4">{row.completedTasks}</td>
-                    <td className="py-3 pr-4">{row.activeTasks}</td>
-                    <td className="py-3">{row.loggedMinutes}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
+        <PerformanceTableClient rows={data.performance} />
 
         <Panel
           title={user.role === "employee" ? "My Attendance" : "Attendance Feed"}
