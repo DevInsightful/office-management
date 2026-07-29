@@ -325,6 +325,9 @@ export async function createTaskAction(formData: FormData) {
   `;
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/tasks");
+  revalidatePath("/dashboard/performance");
+  redirect("/dashboard/tasks");
 }
 
 export async function updateTaskStatusAction(formData: FormData) {
@@ -386,6 +389,8 @@ export async function updateTaskStatusAction(formData: FormData) {
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/tasks");
+  revalidatePath("/dashboard/performance");
 }
 
 export async function startTaskTimerAction(formData: FormData) {
@@ -413,6 +418,7 @@ export async function startTaskTimerAction(formData: FormData) {
   `;
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/tasks");
 }
 
 export async function stopTaskTimerAction(formData: FormData) {
@@ -462,6 +468,8 @@ export async function stopTaskTimerAction(formData: FormData) {
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/tasks");
+  revalidatePath("/dashboard/performance");
 }
 
 export async function addTaskLogAction(formData: FormData) {
@@ -496,6 +504,8 @@ export async function addTaskLogAction(formData: FormData) {
   `;
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/tasks");
+  revalidatePath("/dashboard/performance");
 }
 
 export async function createSalaryRecordAction(formData: FormData) {

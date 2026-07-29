@@ -123,6 +123,7 @@ type TaskLogRow = {
 
 type AttendanceRow = {
   id: number;
+  employee_id: number;
   attendance_date: string;
   check_in_at: string;
   full_name: string;
@@ -132,6 +133,7 @@ type AttendanceRow = {
 
 type AttendanceSqlRow = {
   id: number;
+  employee_id: number;
   attendance_date: string;
   check_in_at: string;
   full_name: string;
@@ -309,6 +311,7 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
       ? sql<AttendanceSqlRow[]>`
           select
             a.id,
+            a.employee_id,
             a.check_in_time::date::text as attendance_date,
             a.check_in_time::text as check_in_at,
             u.full_name,
@@ -323,6 +326,7 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
       : sql<AttendanceSqlRow[]>`
           select
             a.id,
+            a.employee_id,
             a.check_in_time::date::text as attendance_date,
             a.check_in_time::text as check_in_at,
             u.full_name,
@@ -331,7 +335,6 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
           from attendance_records a
           join users u on u.id = a.employee_id
           order by a.check_in_time desc, a.id desc
-          limit 20
         `;
 
   const payrollPromise =

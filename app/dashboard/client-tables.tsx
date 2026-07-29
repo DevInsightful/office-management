@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import {
   deleteFinanceEntryAction,
@@ -820,6 +820,23 @@ type PerformanceRow = {
   loggedMinutes: number;
 };
 
+type AttendanceReportEmployee = {
+  id: number;
+  fullName: string;
+  joinedOn: string;
+  role: "super_admin" | "admin" | "employee";
+};
+
+type AttendanceReportEntry = {
+  id: number;
+  employee_id: number;
+  attendance_date: string;
+  check_in_at: string;
+  full_name: string;
+  accuracy: number | null;
+  distanceFromOffice: number | null;
+};
+
 export function PerformanceTableClient({ rows }: { rows: PerformanceRow[] }) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"fullName" | "attendanceCount" | "completedTasks" | "activeTasks" | "loggedMinutes">("fullName");
@@ -883,6 +900,260 @@ export function PerformanceTableClient({ rows }: { rows: PerformanceRow[] }) {
   );
 }
 
+function buildAttendanceRange(period: string, today: string, earliestJoinedOn: string) {
+  if (period === "today") {
+    return { from: today, to: today };
+  }
+
+  const startOfToday = new Date(`${today}T00:00:00`);
+
+  if (period === "week") {
+    const day = startOfToday.getDay();
+    const distanceFromMonday = day === 0 ? 6 : day - 1;
+    const weekStart = new Date(startOfToday);
+    weekStart.setDate(startOfToday.getDate() - distanceFromMonday);
+    return { from: weekStart.toISOString().slice(0, 10), to: today };
+  }
+
+  if (period === "month") {
+    return { from: `${today.slice(0, 7)}-01`, to: today };
+  }
+
+  if (period === "year") {
+    return { from: `${today.slice(0, 4)}-01-01`, to: today };
+  }
+
+  return { from: earliestJoinedOn, to: today };
+}
+
+function listDays(from: string, to: string) {
+  const days: string[] = [];
+  const cursor = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+
+  while (cursor <= end) {
+    days.push(cursor.toISOString().slice(0, 10));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return days;
+}
+
+export function AttendanceReportClient({
+  employees,
+  attendance,
+  today,
+}: {
+  employees: AttendanceReportEmployee[];
+  attendance: AttendanceReportEntry[];
+  today: string;
+}) {
+  const [search, setSearch] = useState("");
+  const [period, setPeriod] = useState<"today" | "week" | "month" | "year" | "all">("today");
+  const [employeeId, setEmployeeId] = useState("all");
+  const [sort, setSort] = useState<"full_name" | "attendance_date" | "status">("attendance_date");
+  const [direction, setDirection] = useState<SortDirection>("desc");
+
+  const employeeOptions = useMemo(
+    () =>
+      employees
+        .filter((employee) => employee.role === "employee")
+        .sort((left, right) => left.fullName.localeCompare(right.fullName)),
+    [employees],
+  );
+
+  const earliestJoinedOn = employeeOptions.reduce((earliest, employee) => {
+    if (!earliest || employee.joinedOn < earliest) {
+      return employee.joinedOn;
+    }
+
+    return earliest;
+  }, employeeOptions[0]?.joinedOn ?? today);
+
+  const activeRange = useMemo(
+    () => buildAttendanceRange(period, today, earliestJoinedOn),
+    [earliestJoinedOn, period, today],
+  );
+
+  const filteredEmployees = useMemo(() => {
+    if (employeeId === "all") {
+      return employeeOptions;
+    }
+
+    return employeeOptions.filter((employee) => String(employee.id) === employeeId);
+  }, [employeeId, employeeOptions]);
+
+  const attendanceRows = useMemo(() => {
+    const selectedEmployeeIds = new Set(filteredEmployees.map((employee) => employee.id));
+    const attendanceByEmployeeAndDate = new Map<string, AttendanceReportEntry>();
+
+    for (const entry of attendance) {
+      if (!selectedEmployeeIds.has(entry.employee_id)) {
+        continue;
+      }
+
+      if (entry.attendance_date < activeRange.from || entry.attendance_date > activeRange.to) {
+        continue;
+      }
+
+      attendanceByEmployeeAndDate.set(`${entry.employee_id}-${entry.attendance_date}`, entry);
+    }
+
+    const rows = filteredEmployees.flatMap((employee) => {
+      const from = employee.joinedOn > activeRange.from ? employee.joinedOn : activeRange.from;
+      const days = listDays(from, activeRange.to);
+
+      return days.map((day) => {
+        const match = attendanceByEmployeeAndDate.get(`${employee.id}-${day}`);
+        const status = match ? "present" : "absent";
+
+        return {
+          key: `${employee.id}-${day}`,
+          employeeId: employee.id,
+          full_name: employee.fullName,
+          attendance_date: day,
+          status,
+          check_in_at: match?.check_in_at ?? null,
+          accuracy: match?.accuracy ?? null,
+          distanceFromOffice: match?.distanceFromOffice ?? null,
+        };
+      });
+    });
+
+    return rows
+      .filter((row) => matchesSearch(search, row.full_name, row.attendance_date, row.status))
+      .sort((left, right) => {
+        if (sort === "attendance_date") {
+          return compareString(left.attendance_date, right.attendance_date, direction);
+        }
+
+        if (sort === "status") {
+          return compareString(left.status, right.status, direction);
+        }
+
+        return compareString(left.full_name, right.full_name, direction);
+      });
+  }, [activeRange.from, activeRange.to, attendance, direction, filteredEmployees, search, sort]);
+
+  const totals = useMemo(
+    () =>
+      attendanceRows.reduce(
+        (acc, row) => {
+          acc.total += 1;
+          if (row.status === "present") {
+            acc.present += 1;
+          } else {
+            acc.absent += 1;
+          }
+          return acc;
+        },
+        { total: 0, present: 0, absent: 0 },
+      ),
+    [attendanceRows],
+  );
+
+  function toggleSort(nextSort: typeof sort) {
+    setDirection((currentDirection) => nextDirection(sort, nextSort, currentDirection));
+    setSort(nextSort);
+  }
+
+  return (
+    <section className="grid gap-4">
+      <section className="grid gap-4 md:grid-cols-3">
+        <MetricCard label="Rows In Period" value={String(totals.total)} tone="sky" />
+        <MetricCard label="Present" value={String(totals.present)} tone="emerald" />
+        <MetricCard label="Absent" value={String(totals.absent)} tone="rose" />
+      </section>
+
+      <Panel title="Attendance Filters" subtitle="Default view shows today for the whole office. Switch period or focus on one employee.">
+        <div className="grid gap-3 lg:grid-cols-[1fr_180px_240px]">
+          <Field label="Search">
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search employee, date, or status"
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Period">
+            <select value={period} onChange={(event) => setPeriod(event.target.value as typeof period)} className={inputClass}>
+              <option value="today">Today</option>
+              <option value="week">Week</option>
+              <option value="month">Month</option>
+              <option value="year">Year</option>
+              <option value="all">All</option>
+            </select>
+          </Field>
+          <Field label="Employee">
+            <select value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} className={inputClass}>
+              <option value="all">All employees</option>
+              {employeeOptions.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.fullName}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </Panel>
+
+      <Panel
+        title="Attendance Report"
+        subtitle={`Showing ${activeRange.from} to ${activeRange.to}. Employees without a check-in in this range are marked absent.`}
+      >
+        <div className="max-w-full overflow-x-auto">
+          <table className="min-w-[900px] table-fixed text-sm">
+            <thead className="text-left text-slate-500">
+              <tr>
+                <th className="w-[22%] pb-3 pr-3 font-medium"><SortButton label="Employee" active={sort === "full_name"} direction={direction} onClick={() => toggleSort("full_name")} /></th>
+                <th className="w-[16%] pb-3 pr-3 font-medium"><SortButton label="Date" active={sort === "attendance_date"} direction={direction} onClick={() => toggleSort("attendance_date")} /></th>
+                <th className="w-[14%] pb-3 pr-3 font-medium"><SortButton label="Status" active={sort === "status"} direction={direction} onClick={() => toggleSort("status")} /></th>
+                <th className="w-[20%] pb-3 pr-3 font-medium">Check In</th>
+                <th className="w-[14%] pb-3 pr-3 font-medium">Distance</th>
+                <th className="w-[14%] pb-3 font-medium">Accuracy</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {attendanceRows.length > 0 ? (
+                attendanceRows.map((row) => (
+                  <tr key={row.key}>
+                    <td className="py-3 pr-3 font-medium text-slate-900">{row.full_name}</td>
+                    <td className="py-3 pr-3 text-slate-600">{row.attendance_date}</td>
+                    <td className="py-3 pr-3">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] ${
+                          row.status === "present" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+                        }`}
+                      >
+                        {row.status}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-3 text-slate-600">
+                      {row.check_in_at ? new Date(row.check_in_at).toLocaleString() : "-"}
+                    </td>
+                    <td className="py-3 pr-3 text-slate-600">
+                      {row.distanceFromOffice !== null ? `${row.distanceFromOffice.toFixed(1)} m` : "-"}
+                    </td>
+                    <td className="py-3 text-slate-600">
+                      {row.accuracy !== null ? `${row.accuracy.toFixed(1)} m` : "-"}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-slate-500">
+                    No attendance rows match the current filters.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+    </section>
+  );
+}
+
 type TaskRow = {
   id: number;
   title: string;
@@ -899,6 +1170,9 @@ export function TasksBoardClient({ tasks }: { tasks: TaskRow[] }) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"title" | "employee_name" | "priority" | "status" | "timer_total_minutes">("title");
   const [direction, setDirection] = useState<SortDirection>("asc");
+  const [statusOverrides, setStatusOverrides] = useState<Record<number, TaskRow["status"]>>({});
+  const [pendingStatusTaskIds, setPendingStatusTaskIds] = useState<number[]>([]);
+  const [, startTransition] = useTransition();
 
   const filteredTasks = useMemo(() => {
     return [...tasks]
@@ -934,6 +1208,29 @@ export function TasksBoardClient({ tasks }: { tasks: TaskRow[] }) {
   function toggleSort(nextSort: typeof sort) {
     setDirection((currentDirection) => nextDirection(sort, nextSort, currentDirection));
     setSort(nextSort);
+  }
+
+  function updateTaskStatus(taskId: number, status: TaskRow["status"]) {
+    setStatusOverrides((current) => ({
+      ...current,
+      [taskId]: status,
+    }));
+    setPendingStatusTaskIds((current) => [...current, taskId]);
+
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("taskId", String(taskId));
+      formData.set("status", status);
+      formData.set("description", "");
+      formData.set("minutesSpent", "0");
+
+      try {
+        await updateTaskStatusAction(formData);
+        router.refresh();
+      } finally {
+        setPendingStatusTaskIds((current) => current.filter((id) => id !== taskId));
+      }
+    });
   }
 
   return (
@@ -985,28 +1282,27 @@ export function TasksBoardClient({ tasks }: { tasks: TaskRow[] }) {
                     <PriorityBadge priority={task.priority} />
                   </td>
                   <td className="py-3 pr-3 align-top">
-                    <form
-                      action={updateTaskStatusAction}
+                    <div
                       className="inline-flex items-center gap-2"
                       onClick={(event) => event.stopPropagation()}
                       onKeyDown={(event) => event.stopPropagation()}
                     >
-                      <input type="hidden" name="taskId" value={task.id} />
-                      <input type="hidden" name="description" value="" />
-                      <input type="hidden" name="minutesSpent" value="0" />
                       <select
-                        name="status"
-                        defaultValue={task.status}
+                        value={statusOverrides[task.id] ?? task.status}
                         aria-label={`Update status for ${task.title}`}
-                        onChange={(event) => event.currentTarget.form?.requestSubmit()}
+                        onChange={(event) => {
+                          const nextStatus = event.target.value as TaskRow["status"];
+                          updateTaskStatus(task.id, nextStatus);
+                        }}
+                        disabled={pendingStatusTaskIds.includes(task.id)}
                         className="min-w-[150px] rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-900 outline-none transition hover:border-slate-300 focus:border-amber-400"
                       >
                         <option value="pending">Pending</option>
                         <option value="working">Working</option>
                         <option value="completed">Completed</option>
                       </select>
-                      <InlinePendingState pendingLabel="Saving..." />
-                    </form>
+                      {pendingStatusTaskIds.includes(task.id) ? <InlinePendingState pendingLabel="Saving..." /> : null}
+                    </div>
                   </td>
                   <td className="py-3 align-top">
                     <div className="space-y-2" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
