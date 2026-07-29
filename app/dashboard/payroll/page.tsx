@@ -28,7 +28,7 @@ export default async function PayrollPage({
   const modal = params?.modal;
 
   return (
-    <>
+    <div className="min-w-0 overflow-x-hidden space-y-4">
       <PageIntro
         eyebrow="Payroll"
         title={user.role === "employee" ? "Your salary records" : "Payroll and salary cycles"}
@@ -88,6 +88,6 @@ export default async function PayrollPage({
           </form>
         </ModalFrame>
       )}
-    </>
+    </div>
   );
 }

@@ -23,7 +23,7 @@ export default async function OrdersPage({
   const selectedOrder = data.orders.find((order) => order.id === selectedOrderId) ?? null;
 
   return (
-    <>
+    <div className="min-w-0 overflow-x-hidden space-y-4">
       <PageIntro
         eyebrow="Orders"
         title={user.role === "employee" ? "My orders" : "Orders and deliveries"}
@@ -143,6 +143,6 @@ export default async function OrdersPage({
           />
         </ModalFrame>
       )}
-    </>
+    </div>
   );
 }
