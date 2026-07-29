@@ -124,8 +124,18 @@ type AttendanceRow = {
   id: number;
   attendance_date: string;
   check_in_at: string;
-  notes: string;
   full_name: string;
+  accuracy: number | null;
+  distanceFromOffice: number | null;
+};
+
+type AttendanceSqlRow = {
+  id: number;
+  attendance_date: string;
+  check_in_at: string;
+  full_name: string;
+  accuracy: string | null;
+  distance_from_office: string | null;
 };
 
 type PayrollRow = {
@@ -295,29 +305,31 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
 
   const attendancePromise =
     user.role === "employee"
-      ? sql<AttendanceRow[]>`
+      ? sql<AttendanceSqlRow[]>`
           select
             a.id,
-            a.attendance_date::text,
-            a.check_in_at::text,
-            a.notes,
-            u.full_name
-          from attendance a
-          join users u on u.id = a.user_id
-          where a.user_id = ${user.id}
-          order by a.attendance_date desc
+            a.check_in_time::date::text as attendance_date,
+            a.check_in_time::text as check_in_at,
+            u.full_name,
+            a.accuracy::text,
+            a.distance_from_office::text
+          from attendance_records a
+          join users u on u.id = a.employee_id
+          where a.employee_id = ${user.id}
+          order by a.check_in_time desc
           limit 15
         `
-      : sql<AttendanceRow[]>`
+      : sql<AttendanceSqlRow[]>`
           select
             a.id,
-            a.attendance_date::text,
-            a.check_in_at::text,
-            a.notes,
-            u.full_name
-          from attendance a
-          join users u on u.id = a.user_id
-          order by a.attendance_date desc, a.id desc
+            a.check_in_time::date::text as attendance_date,
+            a.check_in_time::text as check_in_at,
+            u.full_name,
+            a.accuracy::text,
+            a.distance_from_office::text
+          from attendance_records a
+          join users u on u.id = a.employee_id
+          order by a.check_in_time desc, a.id desc
           limit 20
         `;
 
@@ -367,7 +379,7 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
             count(distinct t.id) filter (where t.status in ('pending', 'working'))::text as active_tasks,
             coalesce(sum(l.minutes_spent), 0)::text as logged_minutes
           from users u
-          left join attendance a on a.user_id = u.id
+          left join attendance_records a on a.employee_id = u.id
           left join tasks t on t.assigned_to = u.id
           left join task_logs l on l.user_id = u.id
           where u.id = ${user.id}
@@ -382,7 +394,7 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
             count(distinct t.id) filter (where t.status in ('pending', 'working'))::text as active_tasks,
             coalesce(sum(l.minutes_spent), 0)::text as logged_minutes
           from users u
-          left join attendance a on a.user_id = u.id
+          left join attendance_records a on a.employee_id = u.id
           left join tasks t on t.assigned_to = u.id
           left join task_logs l on l.user_id = u.id
           where u.role = 'employee'
@@ -473,7 +485,11 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
       timer_started_at: task.timer_started_at,
     })),
     taskLogs,
-    attendance,
+    attendance: attendance.map((row: AttendanceSqlRow) => ({
+      ...row,
+      accuracy: row.accuracy ? Number(row.accuracy) : null,
+      distanceFromOffice: row.distance_from_office ? Number(row.distance_from_office) : null,
+    })),
     payroll: payroll.map((row: PayrollRow) => ({
       ...row,
       salary: Number(row.salary),

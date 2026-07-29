@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-function formatElapsed(startedAt: string) {
+function formatElapsed(startedAt: string, currentTime: number) {
   const started = new Date(startedAt).getTime();
-  const now = Date.now();
-  const diff = Math.max(0, Math.floor((now - started) / 1000));
+  const diff = Math.max(0, Math.floor((currentTime - started) / 1000));
 
   const hours = Math.floor(diff / 3600);
   const minutes = Math.floor((diff % 3600) / 60);
@@ -19,23 +18,21 @@ export function LiveTaskTimer({
 }: {
   startedAt: string | null;
 }) {
-  const [elapsed, setElapsed] = useState(
-    startedAt ? formatElapsed(startedAt) : "Not running",
-  );
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
 
   useEffect(() => {
     if (!startedAt) {
-      setElapsed("Not running");
       return;
     }
 
-    setElapsed(formatElapsed(startedAt));
     const timer = window.setInterval(() => {
-      setElapsed(formatElapsed(startedAt));
+      setCurrentTime(Date.now());
     }, 1000);
 
     return () => window.clearInterval(timer);
   }, [startedAt]);
+
+  const elapsed = startedAt ? formatElapsed(startedAt, currentTime) : "Not running";
 
   return (
     <span

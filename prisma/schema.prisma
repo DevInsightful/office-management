@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AppRole {
+  super_admin
+  admin
+  employee
+}
+
+model User {
+  id                 Int                 @id @default(autoincrement())
+  fullName           String              @map("full_name")
+  email              String              @unique
+  passwordHash       String              @map("password_hash")
+  role               AppRole
+  joinedOn           DateTime            @map("joined_on") @db.Date
+  salary             Decimal             @db.Decimal(12, 2)
+  active             Boolean             @default(true)
+  createdBy          Int?                @map("created_by")
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  attendanceRecords  Attendance[]
+  attendanceAttempts AttendanceAttempt[]
+
+  @@map("users")
+}
+
+model Attendance {
+  id                 Int       @id @default(autoincrement())
+  employeeId         Int       @map("employee_id")
+  employee           User      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  checkInTime        DateTime  @map("check_in_time") @db.Timestamptz(6)
+  latitude           Decimal?  @db.Decimal(10, 7)
+  longitude          Decimal?  @db.Decimal(10, 7)
+  accuracy           Decimal?  @db.Decimal(8, 2)
+  distanceFromOffice Decimal?  @map("distance_from_office") @db.Decimal(8, 2)
+  officeRadius       Int?      @map("office_radius")
+  ipAddress          String?   @map("ip_address") @db.VarChar(128)
+  userAgent          String?   @map("user_agent")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([employeeId, checkInTime(sort: Desc)])
+  @@map("attendance_records")
+}
+
+model AttendanceAttempt {
+  id                 Int       @id @default(autoincrement())
+  employeeId         Int?      @map("employee_id")
+  employee           User?     @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  latitude           Decimal?  @db.Decimal(10, 7)
+  longitude          Decimal?  @db.Decimal(10, 7)
+  accuracy           Decimal?  @db.Decimal(8, 2)
+  distanceFromOffice Decimal?  @map("distance_from_office") @db.Decimal(8, 2)
+  officeRadius       Int?      @map("office_radius")
+  ipAddress          String?   @map("ip_address") @db.VarChar(128)
+  userAgent          String?   @map("user_agent")
+  result             String
+  message            String
+  requestedAt        DateTime  @default(now()) @map("requested_at") @db.Timestamptz(6)
+
+  @@index([employeeId, requestedAt(sort: Desc)])
+  @@index([ipAddress, requestedAt(sort: Desc)])
+  @@map("attendance_attempts")
+}

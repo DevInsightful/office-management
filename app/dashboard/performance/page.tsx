@@ -56,7 +56,11 @@ export default async function PerformancePage() {
                   <p className="font-medium text-slate-900">{item.full_name}</p>
                   <p className="text-xs uppercase tracking-[0.25em] text-slate-500">{item.attendance_date}</p>
                 </div>
-                <p className="mt-1 text-sm text-slate-600">{item.notes || "Attendance marked without notes."}</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {item.distanceFromOffice !== null && item.accuracy !== null
+                    ? `Distance ${item.distanceFromOffice.toFixed(1)} m | Accuracy ${item.accuracy.toFixed(1)} m`
+                    : "Legacy attendance record without GPS audit data."}
+                </p>
                 <p className="mt-2 text-xs text-slate-500">{new Date(item.check_in_at).toLocaleString()}</p>
               </div>
             ))}

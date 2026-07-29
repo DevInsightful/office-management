@@ -1,18 +1,13 @@
-import { markAttendanceAction } from "@/app/actions";
+import { AttendanceCheckIn } from "@/app/dashboard/attendance-check-in";
 import {
   InsightCard,
   MetricCard,
   PageIntro,
   Panel,
-  Field,
-  inputClass,
-  primaryButton,
   currency,
 } from "@/app/ui";
 import { requireUser } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
-
-const today = new Date().toISOString().slice(0, 10);
 
 export default async function DashboardHomePage() {
   const user = await requireUser();
@@ -105,25 +100,24 @@ export default async function DashboardHomePage() {
           </Panel>
         )}
 
-        <Panel title="Quick Attendance" subtitle="Employees can check in once per day.">
-          <form action={markAttendanceAction} className="space-y-3">
-            <input type="hidden" name="userId" value={user.id} />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Attendance date">
-                <input name="attendanceDate" type="date" defaultValue={today} className={inputClass} />
-              </Field>
-              <Field label="Notes">
-                <input
-                  name="notes"
-                  type="text"
-                  placeholder="Reached office, client meeting, etc."
-                  className={inputClass}
-                />
-              </Field>
+        {user.role === "employee" ? (
+          <Panel title="Quick Attendance" subtitle="Location permission and a live GPS fix are required.">
+            <AttendanceCheckIn />
+          </Panel>
+        ) : (
+          <Panel title="Attendance Controls" subtitle="Employee check-ins are now verified through GPS geofencing.">
+            <div className="space-y-3">
+              <InsightCard
+                title="Server verified"
+                body="Every check-in is validated on the backend using office coordinates from environment configuration."
+              />
+              <InsightCard
+                title="Audit trail"
+                body="Successful and rejected attempts are logged with distance, device context, and request timing."
+              />
             </div>
-            <button className={primaryButton}>Mark my attendance</button>
-          </form>
-        </Panel>
+          </Panel>
+        )}
       </section>
     </>
   );
