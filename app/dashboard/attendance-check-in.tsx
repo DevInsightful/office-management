@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useGeolocation } from "@/hooks/useGeolocation";
@@ -12,6 +13,7 @@ type CheckInResponse = {
 };
 
 export function AttendanceCheckIn() {
+  const router = useRouter();
   const { isLoading, error, requestLocation, retry, permission } = useGeolocation();
   const { maxGpsAccuracyMeters } = getPublicAttendanceConfig();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,6 +71,9 @@ export function AttendanceCheckIn() {
       setMessage(payload.message);
       setDistance(typeof payload.distance === "number" ? payload.distance : null);
       setStatus(payload.success ? "success" : "error");
+      if (payload.success) {
+        router.refresh();
+      }
     } catch {
       setStatus("error");
       setMessage("Unable to submit attendance right now.");

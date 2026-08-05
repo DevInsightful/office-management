@@ -30,11 +30,11 @@ export async function POST(request: Request) {
     );
   }
 
-  if (user.role !== "employee") {
+  if (user.role === "super_admin") {
     return NextResponse.json(
       {
         success: false,
-        message: "Only employees can mark attendance.",
+        message: "Super admin attendance is not required.",
       },
       { status: 403 },
     );

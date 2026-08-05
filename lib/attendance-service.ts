@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getAttendanceConfig } from "@/lib/config";
 import { calculateDistanceMeters } from "@/lib/haversine";
+import { distanceToPolygonMeters, isPointInsidePolygon } from "@/lib/geofence";
 
 type CheckInPayload = {
   employeeId: number;
@@ -125,24 +126,24 @@ export async function checkInAttendance(
     };
   }
 
-  // The employee lookup prevents attendance for deleted, disabled, or non-employee accounts.
+  // Attendance is tracked for active admins and employees; super admins are excluded.
   const employee = await prisma.user.findUnique({
     where: { id: payload.employeeId },
     select: { id: true, active: true, role: true },
   });
 
-  if (!employee || !employee.active || employee.role !== "employee") {
+  if (!employee || !employee.active || employee.role === "super_admin") {
     await logAttempt({
       ...payload,
       officeRadius: config.officeRadiusMeters,
       result: "blocked_validation",
-      message: "Employee account not found.",
+      message: "Attendance is available only for active admins and employees.",
     });
 
     return {
       success: false,
-      message: "Employee account not found.",
-      status: 404,
+      message: "Attendance is available only for active admins and employees.",
+      status: 403,
     };
   }
 
@@ -207,20 +208,42 @@ export async function checkInAttendance(
   }
 
   // Distance is always calculated on the backend; the frontend is advisory only.
-  const distance = roundToSingleDecimal(
-    calculateDistanceMeters(
-      payload.latitude,
-      payload.longitude,
-      config.officeLatitude,
-      config.officeLongitude,
-    ),
-  );
+  const point = {
+    latitude: payload.latitude,
+    longitude: payload.longitude,
+  };
 
-  if (distance > config.officeRadiusMeters) {
+  const polygonDistance = config.officePolygon.length >= 3
+    ? roundToSingleDecimal(distanceToPolygonMeters(point, config.officePolygon))
+    : null;
+  const centroidDistance =
+    polygonDistance === null
+      ? roundToSingleDecimal(
+          calculateDistanceMeters(
+            payload.latitude,
+            payload.longitude,
+            config.officeLatitude,
+            config.officeLongitude,
+          ),
+        )
+      : null;
+  const isInsideGeofence =
+    config.officePolygon.length >= 3
+      ? isPointInsidePolygon(point, config.officePolygon) ||
+        (polygonDistance !== null && polygonDistance <= config.geofenceBufferMeters)
+      : centroidDistance !== null && centroidDistance <= config.officeRadiusMeters;
+  const distance =
+    polygonDistance !== null
+      ? polygonDistance
+      : centroidDistance ?? Number.POSITIVE_INFINITY;
+  const allowedBoundaryMeters =
+    config.officePolygon.length >= 3 ? config.geofenceBufferMeters : config.officeRadiusMeters;
+
+  if (!isInsideGeofence) {
     await logAttempt({
       ...payload,
       distance,
-      officeRadius: config.officeRadiusMeters,
+      officeRadius: allowedBoundaryMeters,
       result: "blocked_outside",
       message: "You are outside the office premises.",
     });
@@ -243,7 +266,7 @@ export async function checkInAttendance(
         longitude: payload.longitude,
         accuracy: payload.accuracy,
         distanceFromOffice: distance,
-        officeRadius: config.officeRadiusMeters,
+        officeRadius: allowedBoundaryMeters,
         ipAddress: payload.ipAddress ?? undefined,
         userAgent: payload.userAgent ?? undefined,
       },
@@ -255,7 +278,7 @@ export async function checkInAttendance(
         longitude: payload.longitude,
         accuracy: payload.accuracy,
         distanceFromOffice: distance,
-        officeRadius: config.officeRadiusMeters,
+        officeRadius: allowedBoundaryMeters,
         ipAddress: payload.ipAddress ?? undefined,
         userAgent: payload.userAgent ?? undefined,
         result: "allowed",

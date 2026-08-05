@@ -45,6 +45,13 @@ function nextDirection(currentSort: string, nextSort: string, currentDirection: 
   return currentDirection === "asc" ? "desc" : "asc";
 }
 
+function formatLocalDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function SortButton({
   label,
   active,
@@ -912,7 +919,7 @@ function buildAttendanceRange(period: string, today: string, earliestJoinedOn: s
     const distanceFromMonday = day === 0 ? 6 : day - 1;
     const weekStart = new Date(startOfToday);
     weekStart.setDate(startOfToday.getDate() - distanceFromMonday);
-    return { from: weekStart.toISOString().slice(0, 10), to: today };
+    return { from: formatLocalDate(weekStart), to: today };
   }
 
   if (period === "month") {
@@ -926,13 +933,29 @@ function buildAttendanceRange(period: string, today: string, earliestJoinedOn: s
   return { from: earliestJoinedOn, to: today };
 }
 
+function clampDate(date: string, min: string, max: string) {
+  if (!date) {
+    return "";
+  }
+
+  if (date < min) {
+    return min;
+  }
+
+  if (date > max) {
+    return max;
+  }
+
+  return date;
+}
+
 function listDays(from: string, to: string) {
   const days: string[] = [];
   const cursor = new Date(`${from}T00:00:00`);
   const end = new Date(`${to}T00:00:00`);
 
   while (cursor <= end) {
-    days.push(cursor.toISOString().slice(0, 10));
+    days.push(formatLocalDate(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
 
@@ -943,21 +966,28 @@ export function AttendanceReportClient({
   employees,
   attendance,
   today,
+  defaultEmployeeId,
+  allowOfficeFilters = true,
 }: {
   employees: AttendanceReportEmployee[];
   attendance: AttendanceReportEntry[];
   today: string;
+  defaultEmployeeId?: number;
+  allowOfficeFilters?: boolean;
 }) {
   const [search, setSearch] = useState("");
-  const [period, setPeriod] = useState<"today" | "week" | "month" | "year" | "all">("today");
-  const [employeeId, setEmployeeId] = useState("all");
+  const [period, setPeriod] = useState<"today" | "week" | "month" | "year" | "specific" | "custom" | "all">("today");
+  const [employeeId, setEmployeeId] = useState(defaultEmployeeId ? String(defaultEmployeeId) : "all");
+  const [specificDate, setSpecificDate] = useState(today);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [sort, setSort] = useState<"full_name" | "attendance_date" | "status">("attendance_date");
   const [direction, setDirection] = useState<SortDirection>("desc");
 
   const employeeOptions = useMemo(
     () =>
       employees
-        .filter((employee) => employee.role === "employee")
+        .filter((employee) => employee.role !== "super_admin")
         .sort((left, right) => left.fullName.localeCompare(right.fullName)),
     [employees],
   );
@@ -970,18 +1000,35 @@ export function AttendanceReportClient({
     return earliest;
   }, employeeOptions[0]?.joinedOn ?? today);
 
-  const activeRange = useMemo(
-    () => buildAttendanceRange(period, today, earliestJoinedOn),
-    [earliestJoinedOn, period, today],
-  );
+  const activeRange = useMemo(() => {
+    if (period === "specific") {
+      const safeDate = clampDate(specificDate || today, earliestJoinedOn, today);
+      return { from: safeDate, to: safeDate };
+    }
+
+    if (period === "custom") {
+      const normalizedFrom = clampDate(from || earliestJoinedOn, earliestJoinedOn, today);
+      const normalizedTo = clampDate(to || today, earliestJoinedOn, today);
+
+      return normalizedFrom <= normalizedTo
+        ? { from: normalizedFrom, to: normalizedTo }
+        : { from: normalizedTo, to: normalizedFrom };
+    }
+
+    return buildAttendanceRange(period, today, earliestJoinedOn);
+  }, [earliestJoinedOn, from, period, specificDate, to, today]);
 
   const filteredEmployees = useMemo(() => {
+    if (!allowOfficeFilters && defaultEmployeeId) {
+      return employeeOptions.filter((employee) => employee.id === defaultEmployeeId);
+    }
+
     if (employeeId === "all") {
       return employeeOptions;
     }
 
     return employeeOptions.filter((employee) => String(employee.id) === employeeId);
-  }, [employeeId, employeeOptions]);
+  }, [allowOfficeFilters, defaultEmployeeId, employeeId, employeeOptions]);
 
   const attendanceRows = useMemo(() => {
     const selectedEmployeeIds = new Set(filteredEmployees.map((employee) => employee.id));
@@ -1057,6 +1104,20 @@ export function AttendanceReportClient({
     setSort(nextSort);
   }
 
+  function handlePeriodChange(nextPeriod: typeof period) {
+    setPeriod(nextPeriod);
+
+    if (nextPeriod === "specific") {
+      setSpecificDate(today);
+      return;
+    }
+
+    if (nextPeriod === "custom") {
+      setFrom(earliestJoinedOn);
+      setTo(today);
+    }
+  }
+
   return (
     <section className="grid gap-4">
       <section className="grid gap-4 md:grid-cols-3">
@@ -1065,34 +1126,76 @@ export function AttendanceReportClient({
         <MetricCard label="Absent" value={String(totals.absent)} tone="rose" />
       </section>
 
-      <Panel title="Attendance Filters" subtitle="Default view shows today for the whole office. Switch period or focus on one employee.">
-        <div className="grid gap-3 lg:grid-cols-[1fr_180px_240px]">
-          <Field label="Search">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search employee, date, or status"
-              className={inputClass}
-            />
-          </Field>
+      <Panel
+        title="Attendance Filters"
+        subtitle={
+          allowOfficeFilters
+            ? "Default view shows today for the whole office. Switch period or focus on one employee."
+            : "Review your own attendance by today, week, month, year, one exact date, or a custom range."
+        }
+      >
+        <div className={`grid gap-3 ${allowOfficeFilters ? "lg:grid-cols-[1fr_180px_220px_180px_180px]" : "lg:grid-cols-[180px_180px_180px]"}`}>
+          {allowOfficeFilters ? (
+            <Field label="Search">
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search employee, date, or status"
+                className={inputClass}
+              />
+            </Field>
+          ) : null}
           <Field label="Period">
-            <select value={period} onChange={(event) => setPeriod(event.target.value as typeof period)} className={inputClass}>
+            <select value={period} onChange={(event) => handlePeriodChange(event.target.value as typeof period)} className={inputClass}>
               <option value="today">Today</option>
               <option value="week">Week</option>
               <option value="month">Month</option>
               <option value="year">Year</option>
+              <option value="specific">Specific date</option>
+              <option value="custom">Custom period</option>
               <option value="all">All</option>
             </select>
           </Field>
-          <Field label="Employee">
-            <select value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} className={inputClass}>
-              <option value="all">All employees</option>
-              {employeeOptions.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.fullName}
-                </option>
-              ))}
-            </select>
+          {allowOfficeFilters ? (
+            <Field label="Employee">
+              <select value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} className={inputClass}>
+                <option value="all">All employees</option>
+                {employeeOptions.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.fullName}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+          <Field label={period === "specific" ? "Date" : "From"}>
+            <input
+              type="date"
+              value={period === "specific" ? specificDate : period === "custom" ? from : activeRange.from}
+              onChange={(event) => {
+                if (period === "specific") {
+                  setSpecificDate(event.target.value);
+                  return;
+                }
+
+                setFrom(event.target.value);
+              }}
+              min={earliestJoinedOn}
+              max={today}
+              disabled={period !== "specific" && period !== "custom"}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="To">
+            <input
+              type="date"
+              value={period === "custom" ? to : activeRange.to}
+              onChange={(event) => setTo(event.target.value)}
+              min={earliestJoinedOn}
+              max={today}
+              disabled={period !== "custom"}
+              className={inputClass}
+            />
           </Field>
         </div>
       </Panel>
@@ -1148,6 +1251,108 @@ export function AttendanceReportClient({
               )}
             </tbody>
           </table>
+        </div>
+      </Panel>
+    </section>
+  );
+}
+
+export function AttendanceCalendarClient({
+  employees,
+  attendance,
+  today,
+  defaultEmployeeId,
+  allowEmployeeSelect = true,
+}: {
+  employees: AttendanceReportEmployee[];
+  attendance: AttendanceReportEntry[];
+  today: string;
+  defaultEmployeeId: number;
+  allowEmployeeSelect?: boolean;
+}) {
+  const [employeeId, setEmployeeId] = useState(String(defaultEmployeeId));
+
+  const employeeOptions = useMemo(
+    () =>
+      employees
+        .filter((employee) => employee.role !== "super_admin")
+        .sort((left, right) => left.fullName.localeCompare(right.fullName)),
+    [employees],
+  );
+
+  const selectedEmployee =
+    employeeOptions.find((employee) => String(employee.id) === employeeId) ?? employeeOptions[0] ?? null;
+
+  const monthStart = `${today.slice(0, 7)}-01`;
+  const monthEndDate = new Date(`${monthStart}T00:00:00`);
+  monthEndDate.setMonth(monthEndDate.getMonth() + 1);
+  monthEndDate.setDate(0);
+  const monthEnd = formatLocalDate(monthEndDate);
+
+  const effectiveEmployee =
+    allowEmployeeSelect
+      ? selectedEmployee
+      : employeeOptions.find((employee) => employee.id === defaultEmployeeId) ?? selectedEmployee;
+
+  const attendanceDates = useMemo(() => {
+    const dates = new Set<string>();
+
+    for (const entry of attendance) {
+      if (!effectiveEmployee || entry.employee_id !== effectiveEmployee.id) {
+        continue;
+      }
+
+      if (entry.attendance_date >= monthStart && entry.attendance_date <= monthEnd) {
+        dates.add(entry.attendance_date);
+      }
+    }
+
+    return dates;
+  }, [attendance, effectiveEmployee, monthEnd, monthStart]);
+
+  const visibleDays = useMemo(() => {
+    if (!effectiveEmployee) {
+      return [];
+    }
+
+    const effectiveStart = effectiveEmployee.joinedOn > monthStart ? effectiveEmployee.joinedOn : monthStart;
+    return listDays(effectiveStart, monthEnd).map((date) => ({
+      date,
+      status: attendanceDates.has(date) ? "present" : "absent",
+      isToday: date === today,
+    }));
+  }, [attendanceDates, effectiveEmployee, monthEnd, monthStart, today]);
+
+  return (
+    <section className="grid gap-4">
+      <Panel title="Attendance Calendar" subtitle="Current month calendar for one staff member. Present days turn green; missing days stay absent.">
+        <div className={`grid gap-3 ${allowEmployeeSelect ? "lg:grid-cols-[260px_1fr]" : "lg:grid-cols-1"}`}>
+          {allowEmployeeSelect ? (
+            <Field label="Employee">
+              <select value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} className={inputClass}>
+                {employeeOptions.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.fullName}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+            {visibleDays.map((day) => (
+              <div
+                key={day.date}
+                className={`rounded-2xl border p-3 text-sm ${
+                  day.status === "present"
+                    ? "border-emerald-200 bg-emerald-50"
+                    : "border-rose-200 bg-rose-50"
+                } ${day.isToday ? "ring-2 ring-amber-300" : ""}`}
+              >
+                <p className="font-semibold text-slate-900">{day.date.slice(8, 10)}</p>
+                <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-600">{day.status}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </Panel>
     </section>

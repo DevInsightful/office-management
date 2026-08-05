@@ -1,4 +1,3 @@
-import { AttendanceCheckIn } from "@/app/dashboard/attendance-check-in";
 import {
   InsightCard,
   MetricCard,
@@ -51,8 +50,8 @@ export default async function DashboardHomePage() {
               tone="amber"
             />
             <MetricCard
-              label="Current Salary"
-              value={currency(latestPayroll?.amount ?? user.salary)}
+              label="Joined On"
+              value={user.joinedOn}
               tone="rose"
             />
           </>
@@ -100,24 +99,18 @@ export default async function DashboardHomePage() {
           </Panel>
         )}
 
-        {user.role === "employee" ? (
-          <Panel title="Quick Attendance" subtitle="Location permission and a live GPS fix are required.">
-            <AttendanceCheckIn />
-          </Panel>
-        ) : (
-          <Panel title="Attendance Controls" subtitle="Employee check-ins are now verified through GPS geofencing.">
-            <div className="space-y-3">
-              <InsightCard
-                title="Server verified"
-                body="Every check-in is validated on the backend using office coordinates from environment configuration."
-              />
-              <InsightCard
-                title="Audit trail"
-                body="Successful and rejected attempts are logged with distance, device context, and request timing."
-              />
-            </div>
-          </Panel>
-        )}
+        <Panel title="Attendance Page" subtitle="Attendance now lives on its own page with a dedicated check-in flow, calendar, and office report.">
+          <div className="space-y-3">
+            <InsightCard
+              title="Separate flow"
+              body="Use the Attendance page to mark today present and review monthly calendar status without mixing it into overview or performance."
+            />
+            <InsightCard
+              title="Office report"
+              body="Admins and super admin can review filtered present and absent rows by day, week, month, year, or all history."
+            />
+          </div>
+        </Panel>
       </section>
     </>
   );
