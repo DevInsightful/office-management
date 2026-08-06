@@ -307,6 +307,64 @@ export async function markAttendanceAction(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+export async function markAttendanceByAdminAction(formData: FormData) {
+  const actor = await requireAdmin();
+
+  const userId = cleanNumber(formData.get("userId"));
+  const attendanceDate = cleanDate(formData.get("attendanceDate"));
+
+  if (!userId || !attendanceDate) {
+    redirect("/dashboard/attendance?error=invalid_attendance");
+  }
+
+  const users = await sql<{ id: number; role: "super_admin" | "admin" | "employee"; active: boolean }[]>`
+    select id, role, active
+    from users
+    where id = ${userId}
+    limit 1
+  `;
+
+  const target = users[0];
+
+  if (!target || !target.active || target.role === "super_admin") {
+    redirect("/dashboard/attendance?error=invalid_attendance_target");
+  }
+
+  if (actor.role !== "super_admin" && target.role === "admin") {
+    redirect("/dashboard/attendance?error=forbidden");
+  }
+
+  const existing = await sql<{ id: number }[]>`
+    select id
+    from attendance_records
+    where employee_id = ${userId}
+      and check_in_time::date = ${attendanceDate}::date
+    limit 1
+  `;
+
+  if (!existing[0]) {
+    await sql`
+      insert into attendance_records (
+        employee_id,
+        check_in_time,
+        office_radius,
+        user_agent
+      )
+      values (
+        ${userId},
+        (${attendanceDate}::date + time '09:00')::timestamptz,
+        0,
+        ${`Marked manually by ${actor.fullName} (${actor.role})`}
+      )
+    `;
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/attendance");
+  revalidatePath("/dashboard/performance");
+  redirect("/dashboard/attendance");
+}
+
 export async function createTaskAction(formData: FormData) {
   const actor = await requireAdmin();
 

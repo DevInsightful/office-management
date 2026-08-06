@@ -1,10 +1,12 @@
+import { markAttendanceByAdminAction } from "@/app/actions";
 import { AttendanceCheckIn } from "@/app/dashboard/attendance-check-in";
 import { AttendanceCalendarClient, AttendanceReportClient } from "@/app/dashboard/client-tables";
-import { PageIntro, Panel } from "@/app/ui";
+import { PendingSubmitButton } from "@/app/pending-controls";
+import { Field, PageIntro, Panel, inputClass, primaryButton } from "@/app/ui";
 import { requireUser } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
 
-const today = "2026-08-05";
+const today = "2026-08-06";
 
 export default async function AttendancePage() {
   const user = await requireUser();
@@ -15,6 +17,17 @@ export default async function AttendancePage() {
     joinedOn: employee.joinedOn,
     role: employee.role,
   }));
+  const manualAttendanceOptions = data.employees.filter((employee) => {
+    if (employee.role === "super_admin") {
+      return false;
+    }
+
+    if (user.role !== "super_admin" && employee.role === "admin") {
+      return false;
+    }
+
+    return true;
+  });
 
   return (
     <>
@@ -32,6 +45,33 @@ export default async function AttendancePage() {
         {user.role !== "super_admin" ? (
           <Panel title="Today Check-In" subtitle="When check-in succeeds, today is marked present for your account.">
             <AttendanceCheckIn />
+          </Panel>
+        ) : null}
+
+        {user.role !== "employee" ? (
+          <Panel title="Manual Attendance" subtitle="If GPS fails, admin can mark attendance manually for employees. Super admin can also mark admins.">
+            <form action={markAttendanceByAdminAction} className="grid gap-3 lg:grid-cols-[1fr_220px_auto]">
+              <Field label="Employee">
+                <select name="userId" className={inputClass}>
+                  {manualAttendanceOptions.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.fullName} ({employee.role.replace("_", " ")})
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Attendance date">
+                <input name="attendanceDate" type="date" defaultValue={today} max={today} className={inputClass} />
+              </Field>
+              <div className="self-end">
+                <PendingSubmitButton
+                  idleLabel="Mark present"
+                  pendingLabel="Marking..."
+                  className={`${primaryButton} gap-3 lg:w-auto`}
+                  pendingClassName="cursor-not-allowed bg-slate-700 hover:bg-slate-700"
+                />
+              </div>
+            </form>
           </Panel>
         ) : null}
 

@@ -27,6 +27,26 @@ function roundToSingleDecimal(value: number) {
   return Math.round(value * 10) / 10;
 }
 
+function getKarachiDayBounds(date: Date) {
+  const karachiOffsetMs = 5 * 60 * 60 * 1000;
+  const localTime = new Date(date.getTime() + karachiOffsetMs);
+
+  const dayStartLocal = Date.UTC(
+    localTime.getUTCFullYear(),
+    localTime.getUTCMonth(),
+    localTime.getUTCDate(),
+    0,
+    0,
+    0,
+    0,
+  );
+
+  return {
+    start: new Date(dayStartLocal - karachiOffsetMs),
+    end: new Date(dayStartLocal - karachiOffsetMs + 24 * 60 * 60 * 1000),
+  };
+}
+
 // Every attempt is audited so rejected requests still leave a trail for abuse review.
 async function logAttempt(
   payload: Partial<CheckInPayload> & {
@@ -148,10 +168,10 @@ export async function checkInAttendance(
   }
 
   const now = new Date();
-  const duplicateCutoff = new Date(now.getTime() - config.duplicateWindowMinutes * 60_000);
   const rateLimitCutoff = new Date(now.getTime() - config.rateLimitWindowMinutes * 60_000);
+  const attendanceDay = getKarachiDayBounds(now);
 
-  // Rate limiting and duplicate-window checks happen before distance computation.
+  // Rate limiting and duplicate-day checks happen before distance computation.
   const [recentAttemptCount, recentAttendance] = await Promise.all([
     prisma.attendanceAttempt.count({
       where: {
@@ -168,7 +188,8 @@ export async function checkInAttendance(
       where: {
         employeeId: payload.employeeId,
         checkInTime: {
-          gte: duplicateCutoff,
+          gte: attendanceDay.start,
+          lt: attendanceDay.end,
         },
       },
       orderBy: {
@@ -197,12 +218,12 @@ export async function checkInAttendance(
       ...payload,
       officeRadius: config.officeRadiusMeters,
       result: "blocked_duplicate",
-      message: "Attendance has already been marked in the current check-in window.",
+      message: "Attendance has already been marked for today.",
     });
 
     return {
       success: false,
-      message: "Attendance has already been marked in the current check-in window.",
+      message: "Attendance has already been marked for today.",
       status: 409,
     };
   }
