@@ -7,13 +7,12 @@ import { ActionLink, MetricCard, ModalFrame, PageIntro, currency } from "@/app/u
 import { requireUser } from "@/lib/auth";
 import { getOrdersData } from "@/lib/orders";
 
-const today = new Date().toISOString().slice(0, 10);
-
 export default async function OrdersPage({
   searchParams,
 }: {
   searchParams?: Promise<{ modal?: string; order?: string }>;
 }) {
+  const today = new Date().toISOString().slice(0, 10);
   const user = await requireUser();
   const data = await getOrdersData(user);
   const canManageStatus = user.role !== "employee";
@@ -42,7 +41,7 @@ export default async function OrdersPage({
         <MetricCard label="Pending" value={String(data.metrics.pendingOrders)} tone="violet" />
       </section>
 
-      <OrdersTableClient orders={data.orders} canManageStatus={canManageStatus} />
+      <OrdersTableClient orders={data.orders} canManageStatus={canManageStatus} currencyCode={data.currency} />
 
       {modal === "create-order" && (
         <ModalFrame
@@ -66,7 +65,7 @@ export default async function OrdersPage({
           closeHref="/dashboard/orders"
         >
           <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
-            <OrderCopyButton order={selectedOrder} />
+            <OrderCopyButton order={selectedOrder} currencyCode={data.currency} />
             <ActionLink href={`/dashboard/orders?modal=edit-order&order=${selectedOrder.id}`} label="Edit Order" />
             <form action={deleteOrderAction}>
               <input type="hidden" name="orderId" value={selectedOrder.id} />
@@ -90,11 +89,11 @@ export default async function OrdersPage({
               <p><span className="font-semibold text-slate-900">Phone Number:</span> {selectedOrder.phoneNumber}</p>
               <p><span className="font-semibold text-slate-900">Order Details:</span> {selectedOrder.orderDetails}</p>
               <p><span className="font-semibold text-slate-900">Color:</span> {selectedOrder.color}</p>
-              <p><span className="font-semibold text-slate-900">Price:</span> {currency(selectedOrder.price)}</p>
+              <p><span className="font-semibold text-slate-900">Price:</span> {currency(selectedOrder.price, data.currency)}</p>
               <p><span className="font-semibold text-slate-900">Free Delivery:</span> {selectedOrder.freeDelivery ? "Yes" : "No"}</p>
-              <p><span className="font-semibold text-slate-900">Delivery Price:</span> {currency(selectedOrder.deliveryPrice)}</p>
+              <p><span className="font-semibold text-slate-900">Delivery Price:</span> {currency(selectedOrder.deliveryPrice, data.currency)}</p>
               <p><span className="font-semibold text-slate-900">Free Parking:</span> {selectedOrder.freeParking ? "Yes" : "No"}</p>
-              <p><span className="font-semibold text-slate-900">Total:</span> {currency(selectedOrder.total)}</p>
+              <p><span className="font-semibold text-slate-900">Total:</span> {currency(selectedOrder.total, data.currency)}</p>
               <p><span className="font-semibold text-slate-900">Payment Method:</span> {selectedOrder.paymentMethod}</p>
               <p><span className="font-semibold text-slate-900">Status:</span> {selectedOrder.status}</p>
               <p><span className="font-semibold text-slate-900">Description:</span> {selectedOrder.description || "No extra description."}</p>

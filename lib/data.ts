@@ -1,9 +1,12 @@
 import { SessionUser } from "@/lib/auth";
 import { ensureDb, sql } from "@/lib/db";
 import { seedIfEmpty } from "@/lib/seed";
+import { CurrencyCode, currency } from "@/lib/currency";
+import { getCurrencySetting } from "@/lib/settings";
 
 export type DashboardData = {
   user: SessionUser;
+  currency: CurrencyCode;
   metrics: {
     income: number;
     expense: number;
@@ -165,6 +168,8 @@ type PerformanceRow = {
 export async function getDashboardData(user: SessionUser): Promise<DashboardData> {
   await ensureDb();
   await seedIfEmpty();
+
+  const currencyCode = await getCurrencySetting();
 
   const [financeSummary, topIncomeCategories, topExpenseCategories, recentFinanceRows] =
     await Promise.all([
@@ -429,6 +434,7 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
 
   return {
     user,
+    currency: currencyCode,
     metrics: {
       income: financeTotals.income,
       expense: financeTotals.expense,
@@ -438,10 +444,10 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
     },
     insights: {
       majorIncome: majorIncome
-        ? `${majorIncome.category} is the strongest income stream at PKR ${Number(majorIncome.total).toLocaleString()}.`
+        ? `${majorIncome.category} is the strongest income stream at ${currency(Number(majorIncome.total), currencyCode)}.`
         : "No income recorded yet.",
       majorExpense: majorExpense
-        ? `${majorExpense.category} is the highest expense bucket at PKR ${Number(majorExpense.total).toLocaleString()}.`
+        ? `${majorExpense.category} is the highest expense bucket at ${currency(Number(majorExpense.total), currencyCode)}.`
         : "No expenses recorded yet.",
       cutSuggestion: majorExpense
         ? `Review ${majorExpense.category}. It is the biggest cost center and should be audited first for possible cuts.`

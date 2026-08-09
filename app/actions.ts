@@ -13,6 +13,8 @@ import {
 } from "@/lib/auth";
 import { ensureDb, sql } from "@/lib/db";
 import { seedIfEmpty } from "@/lib/seed";
+import { SUPPORTED_CURRENCIES } from "@/lib/currency";
+import { setCurrencySetting } from "@/lib/settings";
 import { getSupabaseBucket, getSupabaseClient } from "@/lib/supabase";
 
 function cleanText(value: FormDataEntryValue | null) {
@@ -26,6 +28,21 @@ function cleanNumber(value: FormDataEntryValue | null) {
 function cleanDate(value: FormDataEntryValue | null) {
   const parsed = cleanText(value);
   return parsed || new Date().toISOString().slice(0, 10);
+}
+
+export async function updateCurrencyAction(formData: FormData) {
+  await requireAdmin();
+
+  const currencyCode = cleanText(formData.get("currency"));
+
+  if (!(SUPPORTED_CURRENCIES as readonly string[]).includes(currencyCode)) {
+    redirect("/dashboard/settings?error=invalid_currency");
+  }
+
+  await setCurrencySetting(currencyCode);
+
+  revalidatePath("/dashboard", "layout");
+  redirect("/dashboard/settings?success=currency_updated");
 }
 
 function cleanBoolean(value: FormDataEntryValue | null) {

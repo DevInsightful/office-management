@@ -19,7 +19,7 @@ type CopyOrder = {
   imageUrl: string;
 };
 
-function buildOrderText(order: CopyOrder) {
+function buildOrderText(order: CopyOrder, currencyCode: string) {
   const lines = [
     `Booking Date: ${order.bookingDate}`,
     `Delivery Date: ${order.deliveryDate}`,
@@ -29,10 +29,10 @@ function buildOrderText(order: CopyOrder) {
     `Phone Number: ${order.phoneNumber}`,
     `Order Details: ${order.orderDetails}`,
     `Color: ${order.color}`,
-    `Price: GBP ${order.price}`,
+    `Price: ${currencyCode} ${order.price}`,
     `Free delivery: ${order.freeDelivery ? "Yes" : "No"}`,
     `Free parking available: ${order.freeParking ? "Yes" : "No"}`,
-    `Total: GBP ${order.total} ${order.paymentMethod}`,
+    `Total: ${currencyCode} ${order.total} ${order.paymentMethod}`,
   ];
 
   if (order.description) {
@@ -42,13 +42,13 @@ function buildOrderText(order: CopyOrder) {
   return lines.join("\n");
 }
 
-export function OrderCopyButton({ order }: { order: CopyOrder }) {
+export function OrderCopyButton({ order, currencyCode }: { order: CopyOrder; currencyCode: string }) {
   const [textLabel, setTextLabel] = useState("Copy text");
   const [imageLabel, setImageLabel] = useState("Copy image");
 
   async function handleCopyText() {
     try {
-      await navigator.clipboard.writeText(buildOrderText(order));
+      await navigator.clipboard.writeText(buildOrderText(order, currencyCode));
       setTextLabel("Copied");
       window.setTimeout(() => setTextLabel("Copy text"), 2000);
     } catch {

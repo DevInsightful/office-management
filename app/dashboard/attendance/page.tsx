@@ -6,9 +6,8 @@ import { Field, PageIntro, Panel, inputClass, primaryButton } from "@/app/ui";
 import { requireUser } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
 
-const today = new Date().toISOString().slice(0, 10);
-
 export default async function AttendancePage() {
+  const today = new Date().toISOString().slice(0, 10);
   const user = await requireUser();
   const data = await getDashboardData(user);
   const trackedEmployees = data.employees.map((employee) => ({

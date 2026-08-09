@@ -13,14 +13,13 @@ import {
 import { requireUser } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
 
-const today = new Date().toISOString().slice(0, 10);
-const currentMonth = today.slice(0, 7);
-
 export default async function PayrollPage({
   searchParams,
 }: {
   searchParams?: Promise<{ modal?: string }>;
 }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const currentMonth = today.slice(0, 7);
   const user = await requireUser();
   const data = await getDashboardData(user);
   const canManage = user.role !== "employee";
@@ -48,6 +47,7 @@ export default async function PayrollPage({
           };
         })}
         canManage={canManage}
+        currencyCode={data.currency}
       />
 
       {canManage && modal === "new-cycle" && (

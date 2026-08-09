@@ -5,13 +5,12 @@ import { ActionLink, Field, ModalFrame, PageIntro, inputClass, primaryButton } f
 import { requireAdmin } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
 
-const today = new Date().toISOString().slice(0, 10);
-
 export default async function EmployeesPage({
   searchParams,
 }: {
   searchParams?: Promise<{ modal?: string; user?: string }>;
 }) {
+  const today = new Date().toISOString().slice(0, 10);
   const user = await requireAdmin();
   const data = await getDashboardData(user);
   const params = searchParams ? await searchParams : undefined;
@@ -28,7 +27,11 @@ export default async function EmployeesPage({
         action={<ActionLink href="/dashboard/employees?modal=create-user" label="Create Employee" />}
       />
 
-      <EmployeesDirectoryClient employees={data.employees} canManageAdmins={user.role === "super_admin"} />
+      <EmployeesDirectoryClient
+        employees={data.employees}
+        canManageAdmins={user.role === "super_admin"}
+        currencyCode={data.currency}
+      />
 
       {modal === "create-user" && (
         <ModalFrame

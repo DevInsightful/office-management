@@ -3,6 +3,7 @@ import Link from "next/link";
 import { loginAction } from "@/app/actions";
 import { Field, inputClass, primaryButton, secondaryButton, textareaClass } from "@/app/design-system";
 import { LoginSubmitButton } from "@/app/login-submit-button";
+import { currency } from "@/lib/currency";
 
 export function MissingConfigScreen() {
   return (
@@ -211,10 +212,12 @@ export function CategoryList({
   title,
   rows,
   positive = false,
+  currencyCode,
 }: {
   title: string;
   rows: { category: string; total: number }[];
   positive?: boolean;
+  currencyCode?: string;
 }) {
   return (
     <div>
@@ -224,7 +227,7 @@ export function CategoryList({
           <div key={row.category} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
             <div className="flex items-center justify-between gap-3">
               <p className="font-medium text-slate-900">{row.category}</p>
-              <p className={`font-semibold ${positive ? "text-emerald-700" : "text-rose-700"}`}>{currency(row.total)}</p>
+              <p className={`font-semibold ${positive ? "text-emerald-700" : "text-rose-700"}`}>{currency(row.total, currencyCode)}</p>
             </div>
           </div>
         ))}
@@ -333,12 +336,6 @@ export function calculateCycleCompletion(joinedOn: string) {
   return targetMonth.toISOString().slice(0, 10);
 }
 
-export function currency(value: number) {
-  return new Intl.NumberFormat("en-PK", {
-    style: "currency",
-    currency: "PKR",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+export { currency } from "@/lib/currency";
 
 export { Field, inputClass, primaryButton, secondaryButton, textareaClass };

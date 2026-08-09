@@ -17,6 +17,7 @@ const adminNav = [
   { href: "/dashboard/tasks", label: "Tasks" },
   { href: "/dashboard/performance", label: "Performance" },
   { href: "/dashboard/payroll", label: "Payroll" },
+  { href: "/dashboard/settings", label: "Settings" },
 ];
 
 const employeeNav = [

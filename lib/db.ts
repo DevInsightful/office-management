@@ -211,4 +211,12 @@ async function bootstrap() {
     alter table orders
     add column if not exists delivery_price numeric(12, 2) not null default 0;
   `;
+
+  await sql`
+    create table if not exists app_settings (
+      key text primary key,
+      value text not null,
+      updated_at timestamptz not null default now()
+    );
+  `;
 }

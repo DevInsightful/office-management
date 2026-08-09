@@ -19,6 +19,14 @@ import { Badge, Field, MetricCard, Panel, PriorityBadge, currency, inputClass } 
 
 type SortDirection = "asc" | "desc";
 
+function formatDateTime(value: string | Date) {
+  return new Date(value).toLocaleString("en-GB");
+}
+
+function formatDate(value: string | Date) {
+  return new Date(value).toLocaleDateString("en-GB");
+}
+
 function compareString(left: string, right: string, direction: SortDirection) {
   return left.localeCompare(right) * (direction === "asc" ? 1 : -1);
 }
@@ -162,9 +170,11 @@ function getFinanceRange(period: string, today: string, from: string, to: string
 export function FinanceLedgerClient({
   entries,
   today,
+  currencyCode,
 }: {
   entries: FinanceEntry[];
   today: string;
+  currencyCode: string;
 }) {
   const [search, setSearch] = useState("");
   const [period, setPeriod] = useState("all");
@@ -261,9 +271,9 @@ export function FinanceLedgerClient({
   return (
     <section className="grid gap-4">
       <section className="grid gap-4 md:grid-cols-3">
-        <MetricCard label="Total Income" value={currency(totals.income)} tone="emerald" />
-        <MetricCard label="Total Expense" value={currency(totals.expense)} tone="rose" />
-        <MetricCard label="Net Position" value={currency(totals.income - totals.expense)} tone="amber" />
+        <MetricCard label="Total Income" value={currency(totals.income, currencyCode)} tone="emerald" />
+        <MetricCard label="Total Expense" value={currency(totals.expense, currencyCode)} tone="rose" />
+        <MetricCard label="Net Position" value={currency(totals.income - totals.expense, currencyCode)} tone="amber" />
       </section>
 
       <Panel title="Filters" subtitle="Frontend search and asc/desc column sorting.">
@@ -339,8 +349,8 @@ export function FinanceLedgerClient({
                     <td className="py-3 pr-4">{entry.title}</td>
                     <td className="py-3 pr-4 text-slate-600">{entry.category}</td>
                     <td className="py-3 pr-4 text-slate-600">{entry.entry_date}</td>
-                    <td className="py-3 pr-4 text-slate-600">{new Date(entry.created_at).toLocaleString()}</td>
-                    <td className="py-3 pr-4 font-semibold">{currency(entry.amount)}</td>
+                    <td className="py-3 pr-4 text-slate-600">{formatDateTime(entry.created_at)}</td>
+                    <td className="py-3 pr-4 font-semibold">{currency(entry.amount, currencyCode)}</td>
                     <td className="py-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
@@ -391,9 +401,11 @@ type EmployeeRow = {
 export function EmployeesDirectoryClient({
   employees,
   canManageAdmins,
+  currencyCode,
 }: {
   employees: EmployeeRow[];
   canManageAdmins: boolean;
+  currencyCode: string;
 }) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"fullName" | "email" | "role" | "joinedOn" | "salary">("fullName");
@@ -453,8 +465,8 @@ export function EmployeesDirectoryClient({
                   <td className="py-3 pr-4 text-slate-600">{employee.email}</td>
                   <td className="py-3 pr-4 text-slate-600">{employee.role.replace("_", " ")}</td>
                   <td className="py-3 pr-4 text-slate-600">{employee.joinedOn}</td>
-                  <td className="py-3 pr-4 font-semibold">{currency(employee.salary)}</td>
-                  <td className="py-3 pr-4 text-slate-600">{new Date(employee.createdAt).toLocaleDateString()}</td>
+                  <td className="py-3 pr-4 font-semibold">{currency(employee.salary, currencyCode)}</td>
+                  <td className="py-3 pr-4 text-slate-600">{formatDate(employee.createdAt)}</td>
                   <td className="py-3">
                     {employee.role === "super_admin" || (!canManageAdmins && employee.role === "admin") ? (
                       <span className="text-sm text-slate-400">-</span>
@@ -505,9 +517,11 @@ type OrderRow = {
 export function OrdersTableClient({
   orders,
   canManageStatus,
+  currencyCode,
 }: {
   orders: OrderRow[];
   canManageStatus: boolean;
+  currencyCode: string;
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -618,7 +632,7 @@ export function OrdersTableClient({
                   </td>
                   <td className="py-3 pr-3 text-slate-600">{order.bookingDate}</td>
                   <td className="py-3 pr-3 text-slate-600">{order.deliveryDate}</td>
-                  <td className="py-3 pr-3 font-semibold">{currency(order.total)}</td>
+                  <td className="py-3 pr-3 font-semibold">{currency(order.total, currencyCode)}</td>
                   <td className="py-3 pr-3">
                     {canManageStatus ? (
                       <form
@@ -629,6 +643,7 @@ export function OrdersTableClient({
                       >
                         <input type="hidden" name="orderId" value={order.id} />
                         <select
+                          key={order.status}
                           name="status"
                           defaultValue={order.status}
                           aria-label={`Update status for order ${order.id}`}
@@ -647,7 +662,7 @@ export function OrdersTableClient({
                       <Badge>{order.status}</Badge>
                     )}
                   </td>
-                  <td className="py-3 pr-3 text-slate-600">{new Date(order.createdAt).toLocaleDateString()}</td>
+                  <td className="py-3 pr-3 text-slate-600">{formatDate(order.createdAt)}</td>
                   <td className="py-3 pr-3">
                     <Link
                       href={order.imageUrl}
@@ -693,9 +708,11 @@ type PayrollRow = {
 export function PayrollTableClient({
   payroll,
   canManage,
+  currencyCode,
 }: {
   payroll: PayrollRow[];
   canManage: boolean;
+  currencyCode: string;
 }) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"full_name" | "joined_on" | "cycle_month" | "due_date" | "amount" | "status">("full_name");
@@ -787,8 +804,8 @@ export function PayrollTableClient({
                   <td className="py-3 pr-3 text-slate-600">{record.joined_on}</td>
                   <td className="py-3 pr-3 text-slate-600">{record.cycle_month || "Not created"}</td>
                   <td className="py-3 pr-3 text-slate-600">{record.due_date || "Pending"}</td>
-                  <td className="py-3 pr-3 font-semibold">{currency(record.salary)}</td>
-                  <td className="py-3 pr-3 font-semibold">{currency(record.amount ?? record.salary)}</td>
+                  <td className="py-3 pr-3 font-semibold">{currency(record.salary, currencyCode)}</td>
+                  <td className="py-3 pr-3 font-semibold">{currency(record.amount ?? record.salary, currencyCode)}</td>
                   <td className="py-3 pr-3 text-slate-600">{record.status || "not created"}</td>
                   <td className="py-3 pr-3 text-slate-600">{record.monthComplete}</td>
                   {canManage ? (
@@ -1232,7 +1249,7 @@ export function AttendanceReportClient({
                       </span>
                     </td>
                     <td className="py-3 pr-3 text-slate-600">
-                      {row.check_in_at ? new Date(row.check_in_at).toLocaleString() : "-"}
+                      {row.check_in_at ? formatDateTime(row.check_in_at) : "-"}
                     </td>
                     <td className="py-3 pr-3 text-slate-600">
                       {row.distanceFromOffice !== null ? `${row.distanceFromOffice.toFixed(1)} m` : "-"}

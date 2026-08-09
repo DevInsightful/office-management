@@ -57,9 +57,9 @@ export default async function DashboardHomePage() {
           </>
         ) : (
           <>
-            <MetricCard label="Total Income" value={currency(data.metrics.income)} tone="emerald" />
-            <MetricCard label="Total Expenses" value={currency(data.metrics.expense)} tone="rose" />
-            <MetricCard label="Net Position" value={currency(data.metrics.net)} tone="amber" />
+            <MetricCard label="Total Income" value={currency(data.metrics.income, data.currency)} tone="emerald" />
+            <MetricCard label="Total Expenses" value={currency(data.metrics.expense, data.currency)} tone="rose" />
+            <MetricCard label="Net Position" value={currency(data.metrics.net, data.currency)} tone="amber" />
             <MetricCard label="Employees" value={String(data.metrics.employees)} tone="sky" />
             <MetricCard label="Open Tasks" value={String(data.metrics.openTasks)} tone="violet" />
           </>

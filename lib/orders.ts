@@ -1,6 +1,8 @@
 import { SessionUser } from "@/lib/auth";
 import { ensureDb, sql } from "@/lib/db";
 import { seedIfEmpty } from "@/lib/seed";
+import { CurrencyCode } from "@/lib/currency";
+import { getCurrencySetting } from "@/lib/settings";
 import { buildPublicStorageUrl } from "@/lib/supabase";
 
 export type OrderStatus =
@@ -37,6 +39,7 @@ type OrderRow = {
 };
 
 export type OrdersData = {
+  currency: CurrencyCode;
   metrics: {
     totalOrders: number;
     completedOrders: number;
@@ -75,6 +78,8 @@ type OrderItem = OrdersData["orders"][number];
 export async function getOrdersData(user: SessionUser): Promise<OrdersData> {
   await ensureDb();
   await seedIfEmpty();
+
+  const currencyCode = await getCurrencySetting();
 
   const rows =
     user.role === "employee"
@@ -165,6 +170,7 @@ export async function getOrdersData(user: SessionUser): Promise<OrdersData> {
   }));
 
   return {
+    currency: currencyCode,
     metrics: {
       totalOrders: orders.length,
       completedOrders: orders.filter((order: OrderItem) => order.status === "delivered").length,

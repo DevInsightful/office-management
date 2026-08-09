@@ -5,13 +5,12 @@ import { ActionLink, Field, ModalFrame, PageIntro, inputClass, primaryButton, te
 import { requireAdmin } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
 
-const today = new Date().toISOString().slice(0, 10);
-
 export default async function FinancePage({
   searchParams,
 }: {
   searchParams?: Promise<{ modal?: string; entry?: string }>;
 }) {
+  const today = new Date().toISOString().slice(0, 10);
   const user = await requireAdmin();
   const data = await getDashboardData(user);
   const params = searchParams ? await searchParams : undefined;
@@ -28,7 +27,7 @@ export default async function FinancePage({
         action={<ActionLink href="/dashboard/finance?modal=new-entry" label="New Expense / Income" />}
       />
 
-      <FinanceLedgerClient entries={data.finance.recent} today={today} />
+      <FinanceLedgerClient entries={data.finance.recent} today={today} currencyCode={data.currency} />
 
       {modal === "new-entry" && (
         <ModalFrame
