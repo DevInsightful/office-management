@@ -7,7 +7,7 @@ import { ActionLink, MetricCard, ModalFrame, PageIntro, currency } from "@/app/u
 import { requireUser } from "@/lib/auth";
 import { getOrdersData } from "@/lib/orders";
 
-const today = "2026-07-29";
+const today = new Date().toISOString().slice(0, 10);
 
 export default async function OrdersPage({
   searchParams,

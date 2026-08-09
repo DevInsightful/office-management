@@ -5,7 +5,7 @@ import { ActionLink, Field, ModalFrame, PageIntro, inputClass, primaryButton, te
 import { requireAdmin } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
 
-const today = "2026-07-29";
+const today = new Date().toISOString().slice(0, 10);
 
 export default async function FinancePage({
   searchParams,

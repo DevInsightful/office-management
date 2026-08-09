@@ -6,7 +6,7 @@ import { Field, PageIntro, Panel, inputClass, primaryButton } from "@/app/ui";
 import { requireUser } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
 
-const today = "2026-08-06";
+const today = new Date().toISOString().slice(0, 10);
 
 export default async function AttendancePage() {
   const user = await requireUser();
