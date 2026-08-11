@@ -20,11 +20,11 @@ import { Badge, Field, MetricCard, Panel, PriorityBadge, currency, inputClass } 
 type SortDirection = "asc" | "desc";
 
 function formatDateTime(value: string | Date) {
-  return new Date(value).toLocaleString("en-GB");
+  return new Date(value).toLocaleString("en-GB", { timeZone: "Asia/Karachi" });
 }
 
 function formatDate(value: string | Date) {
-  return new Date(value).toLocaleDateString("en-GB");
+  return new Date(value).toLocaleDateString("en-GB", { timeZone: "Asia/Karachi" });
 }
 
 function compareString(left: string, right: string, direction: SortDirection) {

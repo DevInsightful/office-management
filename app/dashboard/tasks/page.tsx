@@ -17,6 +17,10 @@ import {
 import { requireUser } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
 
+function formatDateTime(value: string | Date) {
+  return new Date(value).toLocaleString("en-GB", { timeZone: "Asia/Karachi" });
+}
+
 export default async function TasksPage({
   searchParams,
 }: {
@@ -62,7 +66,7 @@ export default async function TasksPage({
                     <td className="py-3 pr-4 text-slate-600">#{log.task_id}</td>
                     <td className="py-3 pr-4 text-slate-600">{log.minutes_spent}</td>
                     <td className="py-3 pr-4 text-slate-600">{log.description || "No description added."}</td>
-                    <td className="py-3 text-slate-600">{new Date(log.created_at).toLocaleString()}</td>
+                    <td className="py-3 text-slate-600">{formatDateTime(log.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -129,7 +133,7 @@ export default async function TasksPage({
                 <div className="mt-4 grid gap-2 text-sm text-slate-600">
                   <p>Assigned to: {selectedTask.employee_name}</p>
                   <p>Assigned by: {selectedTask.assigned_by_name || "system"}</p>
-                  <p>Created: {new Date(selectedTask.created_at).toLocaleString()}</p>
+                  <p>Created: {formatDateTime(selectedTask.created_at)}</p>
                   <p>Minutes logged: {selectedTask.timer_total_minutes}</p>
                 </div>
               </div>
@@ -222,7 +226,7 @@ export default async function TasksPage({
                           <p className="text-xs uppercase tracking-[0.25em] text-slate-500">{log.minutes_spent} min</p>
                         </div>
                         <p className="mt-2 text-sm text-slate-600">{log.description || "No description added."}</p>
-                        <p className="mt-2 text-xs text-slate-500">{new Date(log.created_at).toLocaleString()}</p>
+                        <p className="mt-2 text-xs text-slate-500">{formatDateTime(log.created_at)}</p>
                       </div>
                     ))
                   ) : (
