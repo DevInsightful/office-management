@@ -82,4 +82,28 @@ export async function seedIfEmpty() {
       (${employeeId}, date_trunc('month', current_date - interval '1 month')::date, current_date - interval '25 days', current_date - interval '24 days', 85000, 'paid')
     on conflict (user_id, cycle_month) do nothing
   `;
+
+  await sql`
+    update users set can_manage_pages = true where id = ${employeeId}
+  `;
+
+  const seededFacebookIds = await sql<{ id: number }[]>`
+    insert into facebook_ids (email, facebook_password, email_password, assigned_to)
+    values
+      ('assigned.account@gmail.com', 'fbpass123', 'gmailpass123', ${employeeId}),
+      ('free.account@gmail.com', 'fbpass456', null, null)
+    on conflict (email) do nothing
+    returning id, email
+  `;
+
+  const assignedFacebookId = seededFacebookIds.find(
+    (row: { id: number; email: string }) => row.email === "assigned.account@gmail.com",
+  );
+
+  if (assignedFacebookId?.id) {
+    await sql`
+      insert into facebook_id_pages (facebook_id_id, name, password)
+      values (${assignedFacebookId.id}, 'ABC Furniture UK', 'pagepass123')
+    `;
+  }
 }

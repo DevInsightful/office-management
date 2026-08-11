@@ -5,17 +5,22 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import {
+  assignFacebookIdAction,
+  deleteFacebookIdAction,
   deleteFinanceEntryAction,
   deleteUserAction,
   markSalaryPaidAction,
   startTaskTimerAction,
   stopTaskTimerAction,
+  unassignFacebookIdAction,
   updateOrderStatusAction,
   updateTaskStatusAction,
 } from "@/app/actions";
 import { LiveTaskTimer } from "@/app/dashboard/live-task-timer";
 import { InlinePendingState, PendingSubmitButton } from "@/app/pending-controls";
-import { Badge, Field, MetricCard, Panel, PriorityBadge, currency, inputClass } from "@/app/ui";
+import { Badge, Field, MetricCard, Panel, PriorityBadge, currency, inputClass, primaryButton } from "@/app/ui";
+import { findCsvColumnIndex, parseCsv } from "@/lib/csv";
+import { validateFacebookIdRow } from "@/lib/facebook-id-validation";
 
 type SortDirection = "asc" | "desc";
 
@@ -1565,5 +1570,515 @@ export function TasksBoardClient({ tasks }: { tasks: TaskRow[] }) {
         </div>
       </Panel>
     </section>
+  );
+}
+
+function MaskedPassword({ value }: { value: string | null }) {
+  const [visible, setVisible] = useState(false);
+
+  if (!value) {
+    return <span className="text-sm text-slate-400">-</span>;
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-sm text-slate-700">{visible ? value : "••••••••"}</span>
+      <button
+        type="button"
+        onClick={() => setVisible((current) => !current)}
+        className="rounded-lg border border-slate-200 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:bg-slate-50"
+      >
+        {visible ? "Hide" : "Show"}
+      </button>
+    </div>
+  );
+}
+
+type FacebookPage = {
+  id: number;
+  name: string;
+  password: string;
+};
+
+type FacebookIdRecord = {
+  id: number;
+  email: string;
+  facebookPassword: string | null;
+  emailPassword: string | null;
+  assignedTo: number | null;
+  assignedToName: string | null;
+  dateCreated: string;
+  createdAt: string;
+  pages: FacebookPage[] | null;
+};
+
+type FacebookEmployeeOption = {
+  id: number;
+  fullName: string;
+  role: string;
+};
+
+export function FacebookIdsClient({
+  records,
+  employees,
+  isAdmin,
+  canManagePages,
+}: {
+  records: FacebookIdRecord[];
+  employees: FacebookEmployeeOption[];
+  isAdmin: boolean;
+  canManagePages: boolean;
+}) {
+  const [search, setSearch] = useState("");
+  const [assignmentFilter, setAssignmentFilter] = useState("all");
+  const [employeeFilter, setEmployeeFilter] = useState("all");
+  const [pagesFilter, setPagesFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sort, setSort] = useState<"email" | "assignedToName" | "dateCreated">("dateCreated");
+  const [direction, setDirection] = useState<SortDirection>("desc");
+
+  const filteredRecords = useMemo(() => {
+    return [...records]
+      .filter((record) => {
+        const matchesQuery = matchesSearch(search, record.email);
+
+        const matchesAssignment =
+          assignmentFilter === "all" ||
+          (assignmentFilter === "assigned" && record.assignedTo !== null) ||
+          (assignmentFilter === "free" && record.assignedTo === null);
+
+        const matchesEmployee =
+          employeeFilter === "all" || String(record.assignedTo ?? "") === employeeFilter;
+
+        const matchesPages =
+          pagesFilter === "all" ||
+          (pagesFilter === "has" && !!record.pages && record.pages.length > 0) ||
+          (pagesFilter === "none" && (!record.pages || record.pages.length === 0));
+
+        const matchesFrom = !dateFrom || record.dateCreated >= dateFrom;
+        const matchesTo = !dateTo || record.dateCreated <= dateTo;
+
+        return matchesQuery && matchesAssignment && matchesEmployee && matchesPages && matchesFrom && matchesTo;
+      })
+      .sort((left, right) => {
+        const leftValue =
+          sort === "email" ? left.email : sort === "assignedToName" ? left.assignedToName ?? "" : left.dateCreated;
+        const rightValue =
+          sort === "email" ? right.email : sort === "assignedToName" ? right.assignedToName ?? "" : right.dateCreated;
+
+        return compareString(leftValue, rightValue, direction);
+      });
+  }, [assignmentFilter, dateFrom, dateTo, direction, employeeFilter, pagesFilter, records, search, sort]);
+
+  function toggleSort(nextSort: typeof sort) {
+    setDirection((currentDirection) => nextDirection(sort, nextSort, currentDirection));
+    setSort(nextSort);
+  }
+
+  return (
+    <section className="grid gap-4">
+      {isAdmin && (
+        <Panel title="Filters" subtitle="Search and filter the Facebook ID pool.">
+          <div className="grid gap-3 lg:grid-cols-3 xl:grid-cols-6">
+            <Field label="Search email">
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search by email"
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Assignment">
+              <select value={assignmentFilter} onChange={(event) => setAssignmentFilter(event.target.value)} className={inputClass}>
+                <option value="all">All</option>
+                <option value="assigned">Assigned</option>
+                <option value="free">Free</option>
+              </select>
+            </Field>
+            <Field label="Employee">
+              <select value={employeeFilter} onChange={(event) => setEmployeeFilter(event.target.value)} className={inputClass}>
+                <option value="all">All employees</option>
+                {employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.fullName}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Pages">
+              <select value={pagesFilter} onChange={(event) => setPagesFilter(event.target.value)} className={inputClass}>
+                <option value="all">All</option>
+                <option value="has">Has pages</option>
+                <option value="none">No pages</option>
+              </select>
+            </Field>
+            <Field label="Created from">
+              <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className={inputClass} />
+            </Field>
+            <Field label="Created to">
+              <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className={inputClass} />
+            </Field>
+          </div>
+        </Panel>
+      )}
+
+      <Panel
+        title={isAdmin ? "All Facebook IDs" : "My Facebook IDs"}
+        subtitle={
+          isAdmin
+            ? "Credentials, assignment, and pages for every Facebook ID in the pool."
+            : "Facebook IDs currently assigned to you."
+        }
+      >
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="text-left text-slate-500">
+              <tr>
+                <th className="pb-3 pr-4 font-medium">
+                  <SortButton label="Email" active={sort === "email"} direction={direction} onClick={() => toggleSort("email")} />
+                </th>
+                {isAdmin && (
+                  <th className="pb-3 pr-4 font-medium">
+                    <SortButton
+                      label="Assigned To"
+                      active={sort === "assignedToName"}
+                      direction={direction}
+                      onClick={() => toggleSort("assignedToName")}
+                    />
+                  </th>
+                )}
+                {!isAdmin && <th className="pb-3 pr-4 font-medium">Facebook Password</th>}
+                {!isAdmin && <th className="pb-3 pr-4 font-medium">Email/Gmail Password</th>}
+                <th className="pb-3 pr-4 font-medium">Pages</th>
+                <th className="pb-3 pr-4 font-medium">
+                  <SortButton
+                    label="Date Created"
+                    active={sort === "dateCreated"}
+                    direction={direction}
+                    onClick={() => toggleSort("dateCreated")}
+                  />
+                </th>
+                <th className="pb-3 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredRecords.length === 0 && (
+                <tr>
+                  <td colSpan={isAdmin ? 5 : 6} className="py-6 text-center text-sm text-slate-500">
+                    No Facebook IDs found.
+                  </td>
+                </tr>
+              )}
+              {filteredRecords.map((record) => (
+                <tr key={record.id}>
+                  <td className="py-3 pr-4 font-medium text-slate-900">{record.email}</td>
+                  {isAdmin && (
+                    <td className="py-3 pr-4">
+                      {record.assignedTo ? (
+                        <span className="text-slate-700">{record.assignedToName}</span>
+                      ) : (
+                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-emerald-700">
+                          Free
+                        </span>
+                      )}
+                    </td>
+                  )}
+                  {!isAdmin && (
+                    <td className="py-3 pr-4">
+                      <MaskedPassword value={record.facebookPassword} />
+                    </td>
+                  )}
+                  {!isAdmin && (
+                    <td className="py-3 pr-4">
+                      <MaskedPassword value={record.emailPassword} />
+                    </td>
+                  )}
+                  <td className="py-3 pr-4">
+                    <Link
+                      href={`/dashboard/facebook-ids?modal=pages&facebookId=${record.id}`}
+                      className="inline-flex rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
+                    >
+                      {record.pages && record.pages.length > 0 ? `${record.pages.length} page${record.pages.length === 1 ? "" : "s"}` : "No pages"}
+                    </Link>
+                  </td>
+                  <td className="py-3 pr-4 text-slate-600">{formatDate(record.dateCreated)}</td>
+                  <td className="py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isAdmin && (
+                        <>
+                          <Link
+                            href={`/dashboard/facebook-ids?modal=assign&facebookId=${record.id}`}
+                            className="inline-flex rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
+                          >
+                            {record.assignedTo ? "Reassign" : "Assign"}
+                          </Link>
+                          {record.assignedTo && (
+                            <form action={unassignFacebookIdAction}>
+                              <input type="hidden" name="facebookIdId" value={record.id} />
+                              <PendingSubmitButton
+                                idleLabel="Unassign"
+                                pendingLabel="Unassigning..."
+                                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
+                                pendingClassName="cursor-not-allowed bg-slate-100 text-slate-500 hover:bg-slate-100"
+                              />
+                            </form>
+                          )}
+                          <Link
+                            href={`/dashboard/facebook-ids?modal=edit-id&facebookId=${record.id}`}
+                            className="inline-flex rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
+                          >
+                            Edit
+                          </Link>
+                          <form action={deleteFacebookIdAction}>
+                            <input type="hidden" name="facebookIdId" value={record.id} />
+                            <PendingSubmitButton
+                              idleLabel="Delete"
+                              pendingLabel="Deleting..."
+                              className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+                              pendingClassName="cursor-not-allowed bg-rose-50 text-rose-400 hover:bg-rose-50"
+                            />
+                          </form>
+                        </>
+                      )}
+                      {!isAdmin && canManagePages && (
+                        <Link
+                          href={`/dashboard/facebook-ids?modal=pages&facebookId=${record.id}`}
+                          className="inline-flex rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
+                        >
+                          Manage Pages
+                        </Link>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+    </section>
+  );
+}
+
+export function AssignFacebookIdForm({
+  facebookIdId,
+  employees,
+}: {
+  facebookIdId: number;
+  employees: FacebookEmployeeOption[];
+}) {
+  return (
+    <form action={assignFacebookIdAction} className="space-y-3">
+      <input type="hidden" name="facebookIdId" value={facebookIdId} />
+      <Field label="Assign to employee">
+        <select name="assigneeId" defaultValue="" className={inputClass} required>
+          <option value="" disabled>
+            Select an employee
+          </option>
+          {employees.map((employee) => (
+            <option key={employee.id} value={employee.id}>
+              {employee.fullName} ({employee.role.replace("_", " ")})
+            </option>
+          ))}
+        </select>
+      </Field>
+      <PendingSubmitButton
+        idleLabel="Assign Facebook ID"
+        pendingLabel="Assigning..."
+        className={`${primaryButton} gap-3`}
+        pendingClassName="cursor-not-allowed bg-slate-700 hover:bg-slate-700"
+      />
+    </form>
+  );
+}
+
+const FACEBOOK_CSV_HEADERS = {
+  email: "Email *",
+  facebookPassword: "Facebook Password *",
+  emailPassword: "Email/Gmail Password",
+};
+
+type CsvPreviewRow = {
+  row: number;
+  email: string;
+  facebookPassword: string;
+  emailPassword: string;
+  status: "valid" | "existing" | "invalid";
+  reason: string | null;
+};
+
+function buildCsvPreview(text: string, existingEmails: Set<string>): CsvPreviewRow[] {
+  const rows = parseCsv(text);
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const header = rows[0].map((cell) => cell.trim());
+  const emailIndex = findCsvColumnIndex(header, FACEBOOK_CSV_HEADERS.email);
+  const facebookPasswordIndex = findCsvColumnIndex(header, FACEBOOK_CSV_HEADERS.facebookPassword);
+  const emailPasswordIndex = findCsvColumnIndex(header, FACEBOOK_CSV_HEADERS.emailPassword);
+
+  if (emailIndex === -1 || facebookPasswordIndex === -1 || emailPasswordIndex === -1) {
+    return [];
+  }
+
+  const dataRows = rows.slice(1).filter((cells) => cells.some((cell) => cell.trim() !== ""));
+  const seenInFile = new Set<string>();
+
+  return dataRows.map((cells, index) => {
+    const emailRaw = (cells[emailIndex] ?? "").trim();
+    const facebookPasswordRaw = (cells[facebookPasswordIndex] ?? "").trim();
+    const emailPasswordRaw = (cells[emailPasswordIndex] ?? "").trim();
+
+    const validation = validateFacebookIdRow({
+      email: cells[emailIndex] ?? "",
+      facebookPassword: cells[facebookPasswordIndex] ?? "",
+      emailPassword: cells[emailPasswordIndex] ?? "",
+    });
+
+    const base = {
+      row: index + 2,
+      email: emailRaw,
+      facebookPassword: facebookPasswordRaw,
+      emailPassword: emailPasswordRaw,
+    };
+
+    if (!validation.valid) {
+      return { ...base, status: "invalid" as const, reason: validation.reason };
+    }
+
+    const normalizedEmail = validation.data.email.toLowerCase();
+
+    if (existingEmails.has(normalizedEmail)) {
+      return { ...base, status: "existing" as const, reason: "Already in database" };
+    }
+
+    if (seenInFile.has(normalizedEmail)) {
+      return { ...base, status: "invalid" as const, reason: "Duplicate email in this file" };
+    }
+
+    seenInFile.add(normalizedEmail);
+    return { ...base, status: "valid" as const, reason: null };
+  });
+}
+
+function CsvStatusBadge({ status }: { status: CsvPreviewRow["status"] }) {
+  if (status === "valid") {
+    return (
+      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
+        Valid to import
+      </span>
+    );
+  }
+
+  if (status === "existing") {
+    return (
+      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
+        Already in DB
+      </span>
+    );
+  }
+
+  return (
+    <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-rose-700">
+      Invalid
+    </span>
+  );
+}
+
+export function FacebookIdsCsvFileField({ existingEmails }: { existingEmails: string[] }) {
+  const [preview, setPreview] = useState<CsvPreviewRow[] | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const normalizedExisting = useMemo(() => new Set(existingEmails.map((email) => email.toLowerCase())), [existingEmails]);
+
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      setPreview(null);
+      setFileName(null);
+      return;
+    }
+
+    setFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? "");
+      setPreview(buildCsvPreview(text, normalizedExisting));
+    };
+    reader.readAsText(file);
+  }
+
+  const validCount = preview?.filter((row) => row.status === "valid").length ?? 0;
+  const existingCount = preview?.filter((row) => row.status === "existing").length ?? 0;
+  const invalidCount = preview?.filter((row) => row.status === "invalid").length ?? 0;
+
+  return (
+    <div className="space-y-3">
+      <Field label="CSV file">
+        <input
+          name="file"
+          type="file"
+          accept=".csv,text/csv"
+          required
+          onChange={handleFileChange}
+          className={inputClass}
+        />
+      </Field>
+
+      {preview && (
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-slate-900">{fileName}</p>
+            <p className="text-xs text-slate-600">
+              {validCount} valid to import · {existingCount} already in DB · {invalidCount} invalid
+            </p>
+          </div>
+          <p className="text-xs font-medium text-slate-600">
+            Only rows marked &ldquo;Valid to import&rdquo; will be imported. Rows already in the database or with missing/invalid data will be skipped.
+          </p>
+          {preview.length === 0 ? (
+            <p className="text-sm text-rose-600">
+              Could not read this file. Make sure it has the headers: Email *, Facebook Password *, Email/Gmail Password.
+            </p>
+          ) : (
+            <div className="max-h-72 overflow-auto rounded-xl border border-slate-200 bg-white">
+              <table className="min-w-full text-sm">
+                <thead className="sticky top-0 bg-white text-left text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Row</th>
+                    <th className="px-3 py-2 font-medium">Email</th>
+                    <th className="px-3 py-2 font-medium">Facebook Password</th>
+                    <th className="px-3 py-2 font-medium">Email/Gmail Password</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {preview.map((row) => (
+                    <tr key={row.row}>
+                      <td className="px-3 py-2 text-slate-600">{row.row}</td>
+                      <td className="px-3 py-2 text-slate-900">{row.email || "-"}</td>
+                      <td className="px-3 py-2 font-mono text-slate-600">{row.facebookPassword || "-"}</td>
+                      <td className="px-3 py-2 font-mono text-slate-600">{row.emailPassword || "-"}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-col gap-1">
+                          <CsvStatusBadge status={row.status} />
+                          {row.reason && row.status !== "valid" && (
+                            <span className="text-[11px] text-slate-500">{row.reason}</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

@@ -43,6 +43,7 @@ export type DashboardData = {
     salary: number;
     active: boolean;
     createdAt: string;
+    canManagePages: boolean;
   }[];
   tasks: {
     id: number;
@@ -99,6 +100,7 @@ type EmployeeRow = {
   salary: string;
   active: boolean;
   created_at: string;
+  can_manage_pages: boolean;
 };
 
 type TaskRow = {
@@ -213,12 +215,12 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
   const employeesPromise =
     user.role === "employee"
       ? sql<EmployeeRow[]>`
-          select id, full_name, email, role, joined_on::text, salary::text, active, created_at::text
+          select id, full_name, email, role, joined_on::text, salary::text, active, created_at::text, can_manage_pages
           from users
           where id = ${user.id}
         `
       : sql<EmployeeRow[]>`
-          select id, full_name, email, role, joined_on::text, salary::text, active, created_at::text
+          select id, full_name, email, role, joined_on::text, salary::text, active, created_at::text, can_manage_pages
           from users
           order by
             case role
@@ -488,6 +490,7 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
       salary: Number(employee.salary),
       active: employee.active,
       createdAt: employee.created_at,
+      canManagePages: employee.can_manage_pages,
     })),
     tasks: tasks.map((task: TaskRow) => ({
       ...task,

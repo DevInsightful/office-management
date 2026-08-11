@@ -16,6 +16,7 @@ export type SessionUser = {
   role: AppRole;
   joinedOn: string;
   salary: number;
+  canManagePages: boolean;
 };
 
 type SessionRow = {
@@ -27,6 +28,7 @@ type SessionRow = {
   role: AppRole;
   joined_on: string;
   salary: string;
+  can_manage_pages: boolean;
 };
 
 export async function hashPassword(password: string) {
@@ -89,7 +91,8 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       u.email,
       u.role,
       u.joined_on::text,
-      u.salary::text
+      u.salary::text,
+      u.can_manage_pages
     from sessions s
     join users u on u.id = s.user_id
     where s.id = ${sessionId}
@@ -111,6 +114,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     role: row.role,
     joinedOn: row.joined_on,
     salary: Number(row.salary),
+    canManagePages: row.can_manage_pages,
   };
 }
 

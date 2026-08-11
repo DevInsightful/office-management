@@ -16,6 +16,9 @@ import { seedIfEmpty } from "@/lib/seed";
 import { SUPPORTED_CURRENCIES } from "@/lib/currency";
 import { setCurrencySetting } from "@/lib/settings";
 import { getSupabaseBucket, getSupabaseClient } from "@/lib/supabase";
+import { findCsvColumnIndex, parseCsv } from "@/lib/csv";
+import { assertFacebookIdAccess } from "@/lib/facebook-ids";
+import { validateFacebookIdRow } from "@/lib/facebook-id-validation";
 
 function cleanText(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
@@ -139,6 +142,7 @@ export async function updateUserAction(formData: FormData) {
   const password = cleanText(formData.get("password"));
   const joinedOn = cleanDate(formData.get("joinedOn"));
   const salary = cleanNumber(formData.get("salary"));
+  const canManagePages = cleanBoolean(formData.get("canManagePages"));
 
   if (!userId || !fullName || !email || !["admin", "employee"].includes(role)) {
     redirect("/dashboard/employees?error=invalid_user_fields");
@@ -176,7 +180,8 @@ export async function updateUserAction(formData: FormData) {
         email = ${email},
         password_hash = ${passwordHash},
         joined_on = ${joinedOn},
-        salary = ${salary}
+        salary = ${salary},
+        can_manage_pages = ${canManagePages}
       where id = ${userId}
     `;
   } else {
@@ -187,13 +192,15 @@ export async function updateUserAction(formData: FormData) {
         full_name = ${fullName},
         email = ${email},
         joined_on = ${joinedOn},
-        salary = ${salary}
+        salary = ${salary},
+        can_manage_pages = ${canManagePages}
       where id = ${userId}
     `;
   }
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/employees");
+  revalidatePath("/dashboard/facebook-ids");
   redirect("/dashboard/employees");
 }
 
@@ -858,4 +865,324 @@ export async function deleteOrderAction(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/orders");
   redirect("/dashboard/orders");
+}
+
+export async function createFacebookIdAction(formData: FormData) {
+  await requireAdmin();
+
+  const validation = validateFacebookIdRow({
+    email: cleanText(formData.get("email")),
+    facebookPassword: cleanText(formData.get("facebookPassword")),
+    emailPassword: cleanText(formData.get("emailPassword")),
+  });
+
+  if (!validation.valid) {
+    redirect(`/dashboard/facebook-ids?modal=new-id&error=${encodeURIComponent(validation.reason)}`);
+  }
+
+  await sql`
+    insert into facebook_ids (email, facebook_password, email_password)
+    values (${validation.data.email}, ${validation.data.facebookPassword}, ${validation.data.emailPassword})
+    on conflict (email) do nothing
+  `;
+
+  revalidatePath("/dashboard/facebook-ids");
+  redirect("/dashboard/facebook-ids");
+}
+
+export async function updateFacebookIdAction(formData: FormData) {
+  await requireAdmin();
+
+  const facebookIdId = cleanNumber(formData.get("facebookIdId"));
+
+  const validation = validateFacebookIdRow({
+    email: cleanText(formData.get("email")),
+    facebookPassword: cleanText(formData.get("facebookPassword")),
+    emailPassword: cleanText(formData.get("emailPassword")),
+  });
+
+  if (!facebookIdId || !validation.valid) {
+    redirect(
+      `/dashboard/facebook-ids?modal=edit-id&facebookId=${facebookIdId}&error=${encodeURIComponent(
+        !facebookIdId ? "Invalid record" : (validation as { reason: string }).reason,
+      )}`,
+    );
+  }
+
+  await sql`
+    update facebook_ids
+    set
+      email = ${validation.data.email},
+      facebook_password = ${validation.data.facebookPassword},
+      email_password = ${validation.data.emailPassword},
+      updated_at = now()
+    where id = ${facebookIdId}
+  `;
+
+  revalidatePath("/dashboard/facebook-ids");
+  redirect("/dashboard/facebook-ids");
+}
+
+export async function deleteFacebookIdAction(formData: FormData) {
+  await requireAdmin();
+  const facebookIdId = cleanNumber(formData.get("facebookIdId"));
+
+  if (!facebookIdId) {
+    redirect("/dashboard/facebook-ids?error=invalid_facebook_id");
+  }
+
+  await sql`delete from facebook_ids where id = ${facebookIdId}`;
+
+  revalidatePath("/dashboard/facebook-ids");
+  redirect("/dashboard/facebook-ids");
+}
+
+export async function assignFacebookIdAction(formData: FormData) {
+  await requireAdmin();
+
+  const facebookIdId = cleanNumber(formData.get("facebookIdId"));
+  const assigneeId = cleanNumber(formData.get("assigneeId"));
+
+  if (!facebookIdId || !assigneeId) {
+    redirect("/dashboard/facebook-ids?error=invalid_assignment");
+  }
+
+  const users = await sql<{ id: number; active: boolean; role: "super_admin" | "admin" | "employee" }[]>`
+    select id, active, role
+    from users
+    where id = ${assigneeId}
+    limit 1
+  `;
+
+  const target = users[0];
+
+  if (!target || !target.active || target.role === "super_admin") {
+    redirect("/dashboard/facebook-ids?error=invalid_assignment_target");
+  }
+
+  await sql`
+    update facebook_ids
+    set assigned_to = ${assigneeId}, updated_at = now()
+    where id = ${facebookIdId}
+  `;
+
+  revalidatePath("/dashboard/facebook-ids");
+  redirect("/dashboard/facebook-ids");
+}
+
+export async function unassignFacebookIdAction(formData: FormData) {
+  await requireAdmin();
+  const facebookIdId = cleanNumber(formData.get("facebookIdId"));
+
+  if (!facebookIdId) {
+    redirect("/dashboard/facebook-ids?error=invalid_facebook_id");
+  }
+
+  await sql`
+    update facebook_ids
+    set assigned_to = null, updated_at = now()
+    where id = ${facebookIdId}
+  `;
+
+  revalidatePath("/dashboard/facebook-ids");
+  redirect("/dashboard/facebook-ids");
+}
+
+async function requirePageManageAccess(facebookIdId: number) {
+  const actor = await requireUser();
+
+  if (actor.role === "employee" && !actor.canManagePages) {
+    redirect("/dashboard/facebook-ids?error=forbidden");
+  }
+
+  const record = await assertFacebookIdAccess(actor, facebookIdId);
+
+  if (!record) {
+    redirect("/dashboard/facebook-ids?error=forbidden");
+  }
+
+  return actor;
+}
+
+export async function addFacebookPageAction(formData: FormData) {
+  const facebookIdId = cleanNumber(formData.get("facebookIdId"));
+  const name = cleanText(formData.get("name"));
+  const password = cleanText(formData.get("password"));
+
+  if (!facebookIdId) {
+    redirect("/dashboard/facebook-ids?error=invalid_facebook_id");
+  }
+
+  await requirePageManageAccess(facebookIdId);
+
+  if (!name || !password) {
+    redirect(`/dashboard/facebook-ids?modal=pages&facebookId=${facebookIdId}&error=invalid_page`);
+  }
+
+  await sql`
+    insert into facebook_id_pages (facebook_id_id, name, password)
+    values (${facebookIdId}, ${name}, ${password})
+  `;
+
+  revalidatePath("/dashboard/facebook-ids");
+  redirect(`/dashboard/facebook-ids?modal=pages&facebookId=${facebookIdId}`);
+}
+
+export async function updateFacebookPageAction(formData: FormData) {
+  const facebookIdId = cleanNumber(formData.get("facebookIdId"));
+  const pageId = cleanNumber(formData.get("pageId"));
+  const name = cleanText(formData.get("name"));
+  const password = cleanText(formData.get("password"));
+
+  if (!facebookIdId || !pageId) {
+    redirect("/dashboard/facebook-ids?error=invalid_facebook_id");
+  }
+
+  await requirePageManageAccess(facebookIdId);
+
+  if (!name || !password) {
+    redirect(`/dashboard/facebook-ids?modal=pages&facebookId=${facebookIdId}&error=invalid_page`);
+  }
+
+  await sql`
+    update facebook_id_pages
+    set name = ${name}, password = ${password}
+    where id = ${pageId} and facebook_id_id = ${facebookIdId}
+  `;
+
+  revalidatePath("/dashboard/facebook-ids");
+  redirect(`/dashboard/facebook-ids?modal=pages&facebookId=${facebookIdId}`);
+}
+
+export async function deleteFacebookPageAction(formData: FormData) {
+  const facebookIdId = cleanNumber(formData.get("facebookIdId"));
+  const pageId = cleanNumber(formData.get("pageId"));
+
+  if (!facebookIdId || !pageId) {
+    redirect("/dashboard/facebook-ids?error=invalid_facebook_id");
+  }
+
+  await requirePageManageAccess(facebookIdId);
+
+  await sql`
+    delete from facebook_id_pages
+    where id = ${pageId} and facebook_id_id = ${facebookIdId}
+  `;
+
+  revalidatePath("/dashboard/facebook-ids");
+  redirect(`/dashboard/facebook-ids?modal=pages&facebookId=${facebookIdId}`);
+}
+
+const FACEBOOK_CSV_HEADERS = {
+  email: "Email *",
+  facebookPassword: "Facebook Password *",
+  emailPassword: "Email/Gmail Password",
+};
+
+export type FacebookImportResult = {
+  totalRows: number;
+  successCount: number;
+  duplicateCount: number;
+  invalidCount: number;
+  failedRows: { row: number; email: string; reason: string }[];
+  duplicateRows: { row: number; email: string; reason: string }[];
+};
+
+export async function importFacebookIdsCsvAction(formData: FormData) {
+  await requireAdmin();
+
+  const file = formData.get("file");
+
+  if (!(file instanceof File) || file.size === 0) {
+    redirect("/dashboard/facebook-ids?modal=import-csv&error=missing_file");
+  }
+
+  const text = await file.text();
+  const rows = parseCsv(text);
+
+  if (rows.length === 0) {
+    redirect("/dashboard/facebook-ids?modal=import-csv&error=empty_file");
+  }
+
+  const header = rows[0].map((cell) => cell.trim());
+  const emailIndex = findCsvColumnIndex(header, FACEBOOK_CSV_HEADERS.email);
+  const facebookPasswordIndex = findCsvColumnIndex(header, FACEBOOK_CSV_HEADERS.facebookPassword);
+  const emailPasswordIndex = findCsvColumnIndex(header, FACEBOOK_CSV_HEADERS.emailPassword);
+
+  if (emailIndex === -1 || facebookPasswordIndex === -1 || emailPasswordIndex === -1) {
+    redirect("/dashboard/facebook-ids?modal=import-csv&error=invalid_headers");
+  }
+
+  const dataRows = rows.slice(1).filter((cells) => cells.some((cell) => cell.trim() !== ""));
+
+  const existingEmailRows = await sql<{ email: string }[]>`
+    select lower(email) as email from facebook_ids
+  `;
+  const existingEmails = new Set(existingEmailRows.map((row: { email: string }) => row.email));
+  const seenInFile = new Set<string>();
+
+  const failedRows: FacebookImportResult["failedRows"] = [];
+  const duplicateRows: FacebookImportResult["duplicateRows"] = [];
+  const toInsert: { email: string; facebookPassword: string | null; emailPassword: string | null }[] = [];
+
+  dataRows.forEach((cells, index) => {
+    const rowNumber = index + 2;
+    const emailRaw = (cells[emailIndex] ?? "").trim();
+
+    const validation = validateFacebookIdRow({
+      email: cells[emailIndex] ?? "",
+      facebookPassword: cells[facebookPasswordIndex] ?? "",
+      emailPassword: cells[emailPasswordIndex] ?? "",
+    });
+
+    if (!validation.valid) {
+      failedRows.push({ row: rowNumber, email: emailRaw, reason: validation.reason });
+      return;
+    }
+
+    const normalizedEmail = validation.data.email.toLowerCase();
+
+    if (existingEmails.has(normalizedEmail) || seenInFile.has(normalizedEmail)) {
+      duplicateRows.push({ row: rowNumber, email: validation.data.email, reason: "Duplicate email" });
+      return;
+    }
+
+    seenInFile.add(normalizedEmail);
+    toInsert.push(validation.data);
+  });
+
+  if (toInsert.length > 0) {
+    await sql`
+      insert into facebook_ids ${sql(
+        toInsert.map((item) => ({
+          email: item.email,
+          facebook_password: item.facebookPassword,
+          email_password: item.emailPassword,
+        })),
+        "email",
+        "facebook_password",
+        "email_password",
+      )}
+    `;
+  }
+
+  const result: FacebookImportResult = {
+    totalRows: dataRows.length,
+    successCount: toInsert.length,
+    duplicateCount: duplicateRows.length,
+    invalidCount: failedRows.length,
+    failedRows,
+    duplicateRows,
+  };
+
+  const importRef = crypto.randomUUID();
+
+  await sql`
+    insert into app_settings (key, value, updated_at)
+    values (${`import_result:${importRef}`}, ${JSON.stringify(result)}, now())
+    on conflict (key) do update set value = excluded.value, updated_at = now()
+  `;
+
+  revalidatePath("/dashboard/facebook-ids");
+  redirect(`/dashboard/facebook-ids?importResult=${importRef}`);
 }

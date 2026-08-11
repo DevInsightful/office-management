@@ -219,4 +219,47 @@ async function bootstrap() {
       updated_at timestamptz not null default now()
     );
   `;
+
+  await sql`
+    alter table users
+    add column if not exists can_manage_pages boolean not null default false;
+  `;
+
+  await sql`
+    create table if not exists facebook_ids (
+      id serial primary key,
+      email text not null unique,
+      facebook_password text,
+      email_password text,
+      assigned_to integer references users(id) on delete set null,
+      date_created date not null default current_date,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+  `;
+
+  await sql`
+    create index if not exists facebook_ids_assigned_to_idx
+    on facebook_ids (assigned_to);
+  `;
+
+  await sql`
+    create index if not exists facebook_ids_email_idx
+    on facebook_ids (lower(email));
+  `;
+
+  await sql`
+    create table if not exists facebook_id_pages (
+      id serial primary key,
+      facebook_id_id integer not null references facebook_ids(id) on delete cascade,
+      name text not null,
+      password text not null,
+      created_at timestamptz not null default now()
+    );
+  `;
+
+  await sql`
+    create index if not exists facebook_id_pages_facebook_id_idx
+    on facebook_id_pages (facebook_id_id);
+  `;
 }

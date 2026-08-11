@@ -147,15 +147,17 @@ export function ModalFrame({
   subtitle,
   closeHref,
   children,
+  widthClassName = "max-w-xl",
 }: {
   title: string;
   subtitle: string;
   closeHref: string;
   children: React.ReactNode;
+  widthClassName?: string;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 sm:p-4">
-      <div className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-xl flex-col overflow-hidden rounded-[1.5rem] border border-white/70 bg-white shadow-[0_30px_100px_rgba(15,23,42,0.25)] sm:max-h-[calc(100vh-2rem)]">
+      <div className={`flex max-h-[calc(100vh-1.5rem)] w-full ${widthClassName} flex-col overflow-hidden rounded-[1.5rem] border border-white/70 bg-white shadow-[0_30px_100px_rgba(15,23,42,0.25)] sm:max-h-[calc(100vh-2rem)]`}>
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
           <div>
             <h2 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">{title}</h2>

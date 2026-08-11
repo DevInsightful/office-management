@@ -116,6 +116,17 @@ export default async function EmployeesPage({
                 <input name="salary" type="number" min="0" step="0.01" defaultValue={selectedUser.salary} className={inputClass} />
               </Field>
             </div>
+            {selectedUser.role === "employee" && (
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  name="canManagePages"
+                  defaultChecked={selectedUser.canManagePages}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                Allow this employee to add, edit, and remove Facebook pages on their assigned IDs
+              </label>
+            )}
             <PendingSubmitButton
               idleLabel="Update user"
               pendingLabel="Updating user..."
