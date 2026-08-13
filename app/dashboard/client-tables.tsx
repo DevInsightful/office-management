@@ -13,14 +13,16 @@ import {
   startTaskTimerAction,
   stopTaskTimerAction,
   unassignFacebookIdAction,
+  updateFacebookIdStatusAction,
   updateOrderStatusAction,
   updateTaskStatusAction,
 } from "@/app/actions";
 import { LiveTaskTimer } from "@/app/dashboard/live-task-timer";
 import { InlinePendingState, PendingSubmitButton } from "@/app/pending-controls";
 import { Badge, Field, MetricCard, Panel, PriorityBadge, currency, inputClass, primaryButton } from "@/app/ui";
-import { findCsvColumnIndex, parseCsv } from "@/lib/csv";
-import { validateFacebookIdRow } from "@/lib/facebook-id-validation";
+import { findCsvColumnIndex } from "@/lib/csv";
+import { FACEBOOK_ID_STATUS_OPTIONS, validateFacebookIdRow } from "@/lib/facebook-id-validation";
+import { parseTabularFile } from "@/lib/spreadsheet";
 
 type SortDirection = "asc" | "desc";
 
@@ -1607,6 +1609,7 @@ type FacebookIdRecord = {
   emailPassword: string | null;
   assignedTo: number | null;
   assignedToName: string | null;
+  status: string[];
   dateCreated: string;
   createdAt: string;
   pages: FacebookPage[] | null;
@@ -1751,6 +1754,7 @@ export function FacebookIdsClient({
                 {!isAdmin && <th className="pb-3 pr-4 font-medium">Facebook Password</th>}
                 {!isAdmin && <th className="pb-3 pr-4 font-medium">Email/Gmail Password</th>}
                 <th className="pb-3 pr-4 font-medium">Pages</th>
+                <th className="pb-3 pr-4 font-medium">ID Status</th>
                 <th className="pb-3 pr-4 font-medium">
                   <SortButton
                     label="Date Created"
@@ -1765,7 +1769,7 @@ export function FacebookIdsClient({
             <tbody className="divide-y divide-slate-100">
               {filteredRecords.length === 0 && (
                 <tr>
-                  <td colSpan={isAdmin ? 5 : 6} className="py-6 text-center text-sm text-slate-500">
+                  <td colSpan={isAdmin ? 6 : 7} className="py-6 text-center text-sm text-slate-500">
                     No Facebook IDs found.
                   </td>
                 </tr>
@@ -1801,6 +1805,23 @@ export function FacebookIdsClient({
                     >
                       {record.pages && record.pages.length > 0 ? `${record.pages.length} page${record.pages.length === 1 ? "" : "s"}` : "No pages"}
                     </Link>
+                  </td>
+                  <td className="py-3 pr-4">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {record.status.length > 0 ? (
+                        record.status.map((tag) => <Badge key={tag}>{tag}</Badge>)
+                      ) : (
+                        <span className="text-xs text-slate-400">No status</span>
+                      )}
+                      {isAdmin && (
+                        <Link
+                          href={`/dashboard/facebook-ids?modal=status&facebookId=${record.id}`}
+                          className="inline-flex rounded-xl border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
+                        >
+                          Edit
+                        </Link>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3 pr-4 text-slate-600">{formatDate(record.dateCreated)}</td>
                   <td className="py-3">
@@ -1864,18 +1885,22 @@ export function FacebookIdsClient({
 export function AssignFacebookIdForm({
   facebookIdId,
   employees,
+  currentAssigneeId,
 }: {
   facebookIdId: number;
   employees: FacebookEmployeeOption[];
+  currentAssigneeId?: number | null;
 }) {
   return (
     <form action={assignFacebookIdAction} className="space-y-3">
       <input type="hidden" name="facebookIdId" value={facebookIdId} />
-      <Field label="Assign to employee">
-        <select name="assigneeId" defaultValue="" className={inputClass} required>
-          <option value="" disabled>
-            Select an employee
-          </option>
+      <Field label="Assign to">
+        <select
+          name="assigneeId"
+          defaultValue={currentAssigneeId ? String(currentAssigneeId) : "free"}
+          className={inputClass}
+        >
+          <option value="free">Free (unassigned)</option>
           {employees.map((employee) => (
             <option key={employee.id} value={employee.id}>
               {employee.fullName} ({employee.role.replace("_", " ")})
@@ -1884,8 +1909,112 @@ export function AssignFacebookIdForm({
         </select>
       </Field>
       <PendingSubmitButton
-        idleLabel="Assign Facebook ID"
-        pendingLabel="Assigning..."
+        idleLabel="Save assignment"
+        pendingLabel="Saving..."
+        className={`${primaryButton} gap-3`}
+        pendingClassName="cursor-not-allowed bg-slate-700 hover:bg-slate-700"
+      />
+    </form>
+  );
+}
+
+export function StatusTagsForm({
+  facebookIdId,
+  currentStatus,
+}: {
+  facebookIdId: number;
+  currentStatus: string[];
+}) {
+  const [selected, setSelected] = useState<string[]>(currentStatus);
+  const [customTag, setCustomTag] = useState("");
+  const extraTags = selected.filter((tag) => !(FACEBOOK_ID_STATUS_OPTIONS as readonly string[]).includes(tag));
+
+  function toggleTag(tag: string) {
+    setSelected((current) => (current.includes(tag) ? current.filter((value) => value !== tag) : [...current, tag]));
+  }
+
+  function addCustomTag() {
+    const tag = customTag.trim();
+
+    if (tag && !selected.includes(tag)) {
+      setSelected((current) => [...current, tag]);
+    }
+
+    setCustomTag("");
+  }
+
+  return (
+    <form action={updateFacebookIdStatusAction} className="space-y-3">
+      <input type="hidden" name="facebookIdId" value={facebookIdId} />
+      {selected.map((tag) => (
+        <input key={tag} type="hidden" name="status" value={tag} />
+      ))}
+
+      <Field label="ID Status tags">
+        <div className="flex flex-wrap gap-2">
+          {FACEBOOK_ID_STATUS_OPTIONS.map((tag) => {
+            const active = selected.includes(tag);
+            return (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => toggleTag(tag)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] transition ${
+                  active ? "bg-slate-950 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {tag}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+
+      {extraTags.length > 0 && (
+        <Field label="Custom tags">
+          <div className="flex flex-wrap gap-2">
+            {extraTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => toggleTag(tag)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-white"
+              >
+                {tag}
+                <span aria-hidden="true">&times;</span>
+              </button>
+            ))}
+          </div>
+        </Field>
+      )}
+
+      <Field label="Add a custom tag">
+        <div className="flex gap-2">
+          <input
+            value={customTag}
+            onChange={(event) => setCustomTag(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addCustomTag();
+              }
+            }}
+            placeholder="e.g. High Value"
+            className={inputClass}
+          />
+          <button
+            type="button"
+            onClick={addCustomTag}
+            className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+          >
+            Add
+          </button>
+        </div>
+      </Field>
+
+      <PendingSubmitButton
+        idleLabel="Save status"
+        pendingLabel="Saving..."
         className={`${primaryButton} gap-3`}
         pendingClassName="cursor-not-allowed bg-slate-700 hover:bg-slate-700"
       />
@@ -1908,9 +2037,7 @@ type CsvPreviewRow = {
   reason: string | null;
 };
 
-function buildCsvPreview(text: string, existingEmails: Set<string>): CsvPreviewRow[] {
-  const rows = parseCsv(text);
-
+function buildCsvPreview(rows: string[][], existingEmails: Set<string>): CsvPreviewRow[] {
   if (rows.length === 0) {
     return [];
   }
@@ -1991,25 +2118,34 @@ function CsvStatusBadge({ status }: { status: CsvPreviewRow["status"] }) {
 export function FacebookIdsCsvFileField({ existingEmails }: { existingEmails: string[] }) {
   const [preview, setPreview] = useState<CsvPreviewRow[] | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [readError, setReadError] = useState(false);
+  const [isReading, setIsReading] = useState(false);
   const normalizedExisting = useMemo(() => new Set(existingEmails.map((email) => email.toLowerCase())), [existingEmails]);
 
-  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
     if (!file) {
       setPreview(null);
       setFileName(null);
+      setReadError(false);
       return;
     }
 
     setFileName(file.name);
+    setReadError(false);
+    setIsReading(true);
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = String(reader.result ?? "");
-      setPreview(buildCsvPreview(text, normalizedExisting));
-    };
-    reader.readAsText(file);
+    try {
+      const buffer = await file.arrayBuffer();
+      const rows = await parseTabularFile(buffer);
+      setPreview(buildCsvPreview(rows, normalizedExisting));
+    } catch {
+      setPreview(null);
+      setReadError(true);
+    } finally {
+      setIsReading(false);
+    }
   }
 
   const validCount = preview?.filter((row) => row.status === "valid").length ?? 0;
@@ -2018,18 +2154,26 @@ export function FacebookIdsCsvFileField({ existingEmails }: { existingEmails: st
 
   return (
     <div className="space-y-3">
-      <Field label="CSV file">
+      <Field label="CSV or Excel file">
         <input
           name="file"
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           required
           onChange={handleFileChange}
           className={inputClass}
         />
       </Field>
 
-      {preview && (
+      {isReading && <p className="text-xs text-slate-500">Reading file...</p>}
+
+      {!isReading && readError && (
+        <p className="text-sm text-rose-600">
+          Could not read {fileName ?? "this file"}. Make sure it is a valid .csv or .xlsx file.
+        </p>
+      )}
+
+      {!isReading && preview && (
         <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-semibold text-slate-900">{fileName}</p>
@@ -2042,7 +2186,7 @@ export function FacebookIdsCsvFileField({ existingEmails }: { existingEmails: st
           </p>
           {preview.length === 0 ? (
             <p className="text-sm text-rose-600">
-              Could not read this file. Make sure it has the headers: Email *, Facebook Password *, Email/Gmail Password.
+              Could not find the expected headers. Make sure the file has: Email *, Facebook Password *, Email/Gmail Password.
             </p>
           ) : (
             <div className="max-h-72 overflow-auto rounded-xl border border-slate-200 bg-white">

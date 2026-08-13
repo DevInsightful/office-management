@@ -1,5 +1,14 @@
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+export const FACEBOOK_ID_STATUS_OPTIONS = [
+  "Active",
+  "Restricted",
+  "Checkpoint",
+  "Banned",
+  "Verified",
+  "Needs Review",
+] as const;
+
 export type FacebookIdRowInput = {
   email: string;
   facebookPassword: string;

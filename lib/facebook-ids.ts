@@ -3,6 +3,7 @@ import { ensureDb, sql } from "@/lib/db";
 import { seedIfEmpty } from "@/lib/seed";
 
 export {
+  FACEBOOK_ID_STATUS_OPTIONS,
   validateFacebookIdRow,
   type FacebookIdRowInput,
   type FacebookIdRowValidation,
@@ -21,6 +22,7 @@ export type FacebookIdRecord = {
   emailPassword: string | null;
   assignedTo: number | null;
   assignedToName: string | null;
+  status: string[];
   dateCreated: string;
   createdAt: string;
   pages: FacebookPage[] | null;
@@ -38,6 +40,7 @@ type FacebookIdRow = {
   email_password: string | null;
   assigned_to: number | null;
   assigned_to_name: string | null;
+  status: string[] | null;
   date_created: string;
   created_at: string;
 };
@@ -63,6 +66,7 @@ export async function getFacebookIdsData(user: SessionUser): Promise<FacebookIds
             fi.email_password,
             fi.assigned_to,
             u.full_name as assigned_to_name,
+            fi.status,
             fi.date_created::text,
             fi.created_at::text
           from facebook_ids fi
@@ -78,6 +82,7 @@ export async function getFacebookIdsData(user: SessionUser): Promise<FacebookIds
             fi.email_password,
             fi.assigned_to,
             u.full_name as assigned_to_name,
+            fi.status,
             fi.date_created::text,
             fi.created_at::text
           from facebook_ids fi
@@ -121,6 +126,7 @@ export async function getFacebookIdsData(user: SessionUser): Promise<FacebookIds
       emailPassword: row.email_password,
       assignedTo: row.assigned_to,
       assignedToName: row.assigned_to_name,
+      status: row.status ?? [],
       dateCreated: row.date_created,
       createdAt: row.created_at,
       pages: pagesByRecord.get(row.id) ?? null,

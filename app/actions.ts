@@ -16,7 +16,8 @@ import { seedIfEmpty } from "@/lib/seed";
 import { SUPPORTED_CURRENCIES } from "@/lib/currency";
 import { setCurrencySetting } from "@/lib/settings";
 import { getSupabaseBucket, getSupabaseClient } from "@/lib/supabase";
-import { findCsvColumnIndex, parseCsv } from "@/lib/csv";
+import { findCsvColumnIndex } from "@/lib/csv";
+import { parseTabularFile } from "@/lib/spreadsheet";
 import { assertFacebookIdAccess } from "@/lib/facebook-ids";
 import { validateFacebookIdRow } from "@/lib/facebook-id-validation";
 
@@ -941,9 +942,26 @@ export async function assignFacebookIdAction(formData: FormData) {
   await requireAdmin();
 
   const facebookIdId = cleanNumber(formData.get("facebookIdId"));
-  const assigneeId = cleanNumber(formData.get("assigneeId"));
+  const rawAssignee = cleanText(formData.get("assigneeId"));
 
-  if (!facebookIdId || !assigneeId) {
+  if (!facebookIdId) {
+    redirect("/dashboard/facebook-ids?error=invalid_assignment");
+  }
+
+  if (!rawAssignee || rawAssignee === "free") {
+    await sql`
+      update facebook_ids
+      set assigned_to = null, updated_at = now()
+      where id = ${facebookIdId}
+    `;
+
+    revalidatePath("/dashboard/facebook-ids");
+    redirect("/dashboard/facebook-ids");
+  }
+
+  const assigneeId = Number(rawAssignee);
+
+  if (!assigneeId) {
     redirect("/dashboard/facebook-ids?error=invalid_assignment");
   }
 
@@ -963,6 +981,30 @@ export async function assignFacebookIdAction(formData: FormData) {
   await sql`
     update facebook_ids
     set assigned_to = ${assigneeId}, updated_at = now()
+    where id = ${facebookIdId}
+  `;
+
+  revalidatePath("/dashboard/facebook-ids");
+  redirect("/dashboard/facebook-ids");
+}
+
+export async function updateFacebookIdStatusAction(formData: FormData) {
+  await requireAdmin();
+
+  const facebookIdId = cleanNumber(formData.get("facebookIdId"));
+
+  if (!facebookIdId) {
+    redirect("/dashboard/facebook-ids?error=invalid_facebook_id");
+  }
+
+  const status = formData
+    .getAll("status")
+    .map((value) => cleanText(value))
+    .filter((value) => value.length > 0);
+
+  await sql`
+    update facebook_ids
+    set status = ${status}, updated_at = now()
     where id = ${facebookIdId}
   `;
 
@@ -1097,8 +1139,14 @@ export async function importFacebookIdsCsvAction(formData: FormData) {
     redirect("/dashboard/facebook-ids?modal=import-csv&error=missing_file");
   }
 
-  const text = await file.text();
-  const rows = parseCsv(text);
+  const buffer = await file.arrayBuffer();
+  let rows: string[][];
+
+  try {
+    rows = await parseTabularFile(buffer);
+  } catch {
+    redirect("/dashboard/facebook-ids?modal=import-csv&error=unreadable_file");
+  }
 
   if (rows.length === 0) {
     redirect("/dashboard/facebook-ids?modal=import-csv&error=empty_file");

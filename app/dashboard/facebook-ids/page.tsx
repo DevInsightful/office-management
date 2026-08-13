@@ -6,11 +6,22 @@ import {
   updateFacebookIdAction,
   updateFacebookPageAction,
 } from "@/app/actions";
-import { AssignFacebookIdForm, FacebookIdsClient, FacebookIdsCsvFileField } from "@/app/dashboard/client-tables";
+import { AssignFacebookIdForm, FacebookIdsClient, FacebookIdsCsvFileField, StatusTagsForm } from "@/app/dashboard/client-tables";
 import { PendingSubmitButton } from "@/app/pending-controls";
 import { ActionLink, Field, ModalFrame, PageIntro, inputClass, primaryButton, secondaryButton } from "@/app/ui";
 import { requireUser } from "@/lib/auth";
 import { consumeImportResult, getFacebookIdsData } from "@/lib/facebook-ids";
+
+const IMPORT_ERROR_MESSAGES: Record<string, string> = {
+  missing_file: "Please choose a CSV or Excel file to import.",
+  empty_file: "That file has no rows to import.",
+  invalid_headers: "Could not find the expected headers. Make sure the file has: Email *, Facebook Password *, Email/Gmail Password.",
+  unreadable_file: "Could not read that file. Make sure it is a valid .csv or .xlsx file.",
+};
+
+function describeImportError(code: string) {
+  return IMPORT_ERROR_MESSAGES[code] ?? code;
+}
 
 export default async function FacebookIdsPage({
   searchParams,
@@ -159,7 +170,21 @@ export default async function FacebookIdsPage({
           subtitle="Choose which employee this Facebook ID should belong to."
           closeHref="/dashboard/facebook-ids"
         >
-          <AssignFacebookIdForm facebookIdId={selectedRecord.id} employees={data.employees} />
+          <AssignFacebookIdForm
+            facebookIdId={selectedRecord.id}
+            employees={data.employees}
+            currentAssigneeId={selectedRecord.assignedTo}
+          />
+        </ModalFrame>
+      )}
+
+      {modal === "status" && isAdmin && selectedRecord && (
+        <ModalFrame
+          title={`ID Status for ${selectedRecord.email}`}
+          subtitle="Tag this Facebook ID with one or more status labels."
+          closeHref="/dashboard/facebook-ids"
+        >
+          <StatusTagsForm facebookIdId={selectedRecord.id} currentStatus={selectedRecord.status} />
         </ModalFrame>
       )}
 
@@ -248,7 +273,7 @@ export default async function FacebookIdsPage({
       {modal === "import-csv" && isAdmin && (
         <ModalFrame
           title="Import Facebook IDs"
-          subtitle="Upload a CSV of Facebook IDs. Each row needs an email and at least one password."
+          subtitle="Upload a CSV or Excel (.xlsx) file of Facebook IDs. Each row needs an email and at least one password."
           closeHref="/dashboard/facebook-ids"
           widthClassName="max-w-3xl"
         >
@@ -261,7 +286,7 @@ export default async function FacebookIdsPage({
             </a>
             <form action={importFacebookIdsCsvAction} className="space-y-3" encType="multipart/form-data">
               <FacebookIdsCsvFileField existingEmails={data.records.map((record) => record.email)} />
-              {params?.error && <p className="text-xs font-medium text-rose-600">{params.error}</p>}
+              {params?.error && <p className="text-xs font-medium text-rose-600">{describeImportError(params.error)}</p>}
               <PendingSubmitButton
                 idleLabel="Import CSV"
                 pendingLabel="Importing..."

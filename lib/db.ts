@@ -239,6 +239,11 @@ async function bootstrap() {
   `;
 
   await sql`
+    alter table facebook_ids
+    add column if not exists status text[] not null default '{}';
+  `;
+
+  await sql`
     create index if not exists facebook_ids_assigned_to_idx
     on facebook_ids (assigned_to);
   `;
