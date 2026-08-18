@@ -49,6 +49,38 @@ export async function updateCurrencyAction(formData: FormData) {
   redirect("/dashboard/settings?success=currency_updated");
 }
 
+export async function updateOwnProfileAction(formData: FormData) {
+  const actor = await requireUser();
+
+  const personalEmail = cleanText(formData.get("personalEmail")).toLowerCase();
+  const bankAccountNo = cleanText(formData.get("bankAccountNo"));
+  const bankIban = cleanText(formData.get("bankIban")).toUpperCase();
+  const bankName = cleanText(formData.get("bankName"));
+  const accountTitle = cleanText(formData.get("accountTitle"));
+
+  const normalizedPersonalEmail = personalEmail || null;
+  const normalizedBankAccountNo = bankAccountNo || null;
+  const normalizedBankIban = bankIban || null;
+  const normalizedBankName = bankName || null;
+  const normalizedAccountTitle = accountTitle || null;
+
+  await sql`
+    update users
+    set
+      personal_email = ${normalizedPersonalEmail},
+      bank_account_no = ${normalizedBankAccountNo},
+      bank_iban = ${normalizedBankIban},
+      bank_name = ${normalizedBankName},
+      account_title = ${normalizedAccountTitle},
+      profile_details_updated_at = now()
+    where id = ${actor.id}
+  `;
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/profile");
+  redirect("/dashboard/profile?success=profile_updated");
+}
+
 function cleanBoolean(value: FormDataEntryValue | null) {
   return value === "on" || value === "true";
 }
@@ -869,7 +901,11 @@ export async function deleteOrderAction(formData: FormData) {
 }
 
 export async function createFacebookIdAction(formData: FormData) {
-  await requireAdmin();
+  const actor = await requireUser();
+
+  if (actor.role === "employee" && !actor.canManagePages) {
+    redirect("/dashboard/facebook-ids?error=forbidden");
+  }
 
   const validation = validateFacebookIdRow({
     email: cleanText(formData.get("email")),
@@ -881,9 +917,11 @@ export async function createFacebookIdAction(formData: FormData) {
     redirect(`/dashboard/facebook-ids?modal=new-id&error=${encodeURIComponent(validation.reason)}`);
   }
 
+  const assignedTo = actor.role === "employee" ? actor.id : null;
+
   await sql`
-    insert into facebook_ids (email, facebook_password, email_password)
-    values (${validation.data.email}, ${validation.data.facebookPassword}, ${validation.data.emailPassword})
+    insert into facebook_ids (email, facebook_password, email_password, assigned_to)
+    values (${validation.data.email}, ${validation.data.facebookPassword}, ${validation.data.emailPassword}, ${assignedTo})
     on conflict (email) do nothing
   `;
 
@@ -986,6 +1024,78 @@ export async function assignFacebookIdAction(formData: FormData) {
 
   revalidatePath("/dashboard/facebook-ids");
   redirect("/dashboard/facebook-ids");
+}
+
+function cleanIdList(formData: FormData, field: string) {
+  return formData
+    .getAll(field)
+    .map((value) => Number(String(value).trim()))
+    .filter((value) => Number.isInteger(value) && value > 0);
+}
+
+export async function bulkAssignFacebookIdsAction(formData: FormData) {
+  await requireAdmin();
+
+  const facebookIdIds = cleanIdList(formData, "facebookIdIds");
+  const rawAssignee = cleanText(formData.get("assigneeId"));
+
+  if (facebookIdIds.length === 0) {
+    return { error: "invalid_assignment" as const };
+  }
+
+  if (!rawAssignee || rawAssignee === "free") {
+    await sql`
+      update facebook_ids
+      set assigned_to = null, updated_at = now()
+      where id in ${sql(facebookIdIds)}
+    `;
+
+    revalidatePath("/dashboard/facebook-ids");
+    return { error: null };
+  }
+
+  const assigneeId = Number(rawAssignee);
+
+  if (!assigneeId) {
+    return { error: "invalid_assignment" as const };
+  }
+
+  const users = await sql<{ id: number; active: boolean; role: "super_admin" | "admin" | "employee" }[]>`
+    select id, active, role
+    from users
+    where id = ${assigneeId}
+    limit 1
+  `;
+
+  const target = users[0];
+
+  if (!target || !target.active || target.role === "super_admin") {
+    return { error: "invalid_assignment_target" as const };
+  }
+
+  await sql`
+    update facebook_ids
+    set assigned_to = ${assigneeId}, updated_at = now()
+    where id in ${sql(facebookIdIds)}
+  `;
+
+  revalidatePath("/dashboard/facebook-ids");
+  return { error: null };
+}
+
+export async function bulkDeleteFacebookIdsAction(formData: FormData) {
+  await requireAdmin();
+
+  const facebookIdIds = cleanIdList(formData, "facebookIdIds");
+
+  if (facebookIdIds.length === 0) {
+    return { error: "invalid_facebook_id" as const };
+  }
+
+  await sql`delete from facebook_ids where id in ${sql(facebookIdIds)}`;
+
+  revalidatePath("/dashboard/facebook-ids");
+  return { error: null };
 }
 
 export async function updateFacebookIdStatusAction(formData: FormData) {

@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 const adminNav = [
   { href: "/dashboard", label: "Overview" },
+  { href: "/dashboard/profile", label: "Profile" },
   { href: "/dashboard/attendance", label: "Attendance" },
   { href: "/dashboard/orders", label: "Orders" },
   { href: "/dashboard/finance", label: "Finance" },
@@ -23,6 +24,7 @@ const adminNav = [
 
 const employeeNav = [
   { href: "/dashboard", label: "Overview" },
+  { href: "/dashboard/profile", label: "My Profile" },
   { href: "/dashboard/attendance", label: "Attendance" },
   { href: "/dashboard/orders", label: "My Orders" },
   { href: "/dashboard/facebook-ids", label: "My Facebook IDs" },

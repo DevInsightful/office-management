@@ -23,6 +23,12 @@ model User {
   active             Boolean             @default(true)
   createdBy          Int?                @map("created_by")
   createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  personalEmail      String?             @map("personal_email")
+  bankAccountNo      String?             @map("bank_account_no")
+  bankIban           String?             @map("bank_iban")
+  bankName           String?             @map("bank_name")
+  accountTitle       String?             @map("account_title")
+  profileDetailsUpdatedAt DateTime?      @map("profile_details_updated_at") @db.Timestamptz(6)
   attendanceRecords  Attendance[]
   attendanceAttempts AttendanceAttempt[]
 

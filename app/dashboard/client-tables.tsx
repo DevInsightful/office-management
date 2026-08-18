@@ -6,6 +6,8 @@ import { useMemo, useState, useTransition } from "react";
 
 import {
   assignFacebookIdAction,
+  bulkAssignFacebookIdsAction,
+  bulkDeleteFacebookIdsAction,
   deleteFacebookIdAction,
   deleteFinanceEntryAction,
   deleteUserAction,
@@ -1632,6 +1634,7 @@ export function FacebookIdsClient({
   isAdmin: boolean;
   canManagePages: boolean;
 }) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [assignmentFilter, setAssignmentFilter] = useState("all");
   const [employeeFilter, setEmployeeFilter] = useState("all");
@@ -1640,6 +1643,10 @@ export function FacebookIdsClient({
   const [dateTo, setDateTo] = useState("");
   const [sort, setSort] = useState<"email" | "assignedToName" | "dateCreated">("dateCreated");
   const [direction, setDirection] = useState<SortDirection>("desc");
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [bulkAssignee, setBulkAssignee] = useState("free");
+  const [isBulkPending, startBulkTransition] = useTransition();
+  const [bulkError, setBulkError] = useState<string | null>(null);
 
   const filteredRecords = useMemo(() => {
     return [...records]
@@ -1677,6 +1684,68 @@ export function FacebookIdsClient({
   function toggleSort(nextSort: typeof sort) {
     setDirection((currentDirection) => nextDirection(sort, nextSort, currentDirection));
     setSort(nextSort);
+  }
+
+  const visibleIds = filteredRecords.map((record) => record.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+
+  function toggleSelected(id: number) {
+    setSelectedIds((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]));
+  }
+
+  function toggleSelectAllVisible() {
+    setSelectedIds((current) =>
+      allVisibleSelected ? current.filter((id) => !visibleIds.includes(id)) : [...new Set([...current, ...visibleIds])],
+    );
+  }
+
+  function runBulkAssign() {
+    if (selectedIds.length === 0) {
+      return;
+    }
+
+    setBulkError(null);
+    startBulkTransition(async () => {
+      const formData = new FormData();
+      selectedIds.forEach((id) => formData.append("facebookIdIds", String(id)));
+      formData.set("assigneeId", bulkAssignee);
+
+      const result = await bulkAssignFacebookIdsAction(formData);
+
+      if (result?.error) {
+        setBulkError(result.error);
+        return;
+      }
+
+      setSelectedIds([]);
+      router.refresh();
+    });
+  }
+
+  function runBulkDelete() {
+    if (selectedIds.length === 0) {
+      return;
+    }
+
+    if (!window.confirm(`Delete ${selectedIds.length} Facebook ID${selectedIds.length === 1 ? "" : "s"}? This cannot be undone.`)) {
+      return;
+    }
+
+    setBulkError(null);
+    startBulkTransition(async () => {
+      const formData = new FormData();
+      selectedIds.forEach((id) => formData.append("facebookIdIds", String(id)));
+
+      const result = await bulkDeleteFacebookIdsAction(formData);
+
+      if (result?.error) {
+        setBulkError(result.error);
+        return;
+      }
+
+      setSelectedIds([]);
+      router.refresh();
+    });
   }
 
   return (

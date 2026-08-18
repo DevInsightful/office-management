@@ -30,6 +30,7 @@ export default async function FacebookIdsPage({
 }) {
   const user = await requireUser();
   const isAdmin = user.role !== "employee";
+  const canAddIds = isAdmin || user.canManagePages;
   const data = await getFacebookIdsData(user);
   const params = searchParams ? await searchParams : undefined;
   const modal = params?.modal;
@@ -48,9 +49,9 @@ export default async function FacebookIdsPage({
             : "Facebook IDs and pages currently assigned to you."
         }
         action={
-          isAdmin ? (
+          canAddIds ? (
             <div className="flex flex-wrap items-center gap-3">
-              <ActionLink href="/dashboard/facebook-ids?modal=import-csv" label="Import CSV" />
+              {isAdmin && <ActionLink href="/dashboard/facebook-ids?modal=import-csv" label="Import CSV" />}
               <ActionLink href="/dashboard/facebook-ids?modal=new-id" label="Add ID" />
             </div>
           ) : undefined
@@ -108,10 +109,14 @@ export default async function FacebookIdsPage({
         canManagePages={user.canManagePages}
       />
 
-      {modal === "new-id" && isAdmin && (
+      {modal === "new-id" && canAddIds && (
         <ModalFrame
           title="Add Facebook ID"
-          subtitle="Create a new Facebook ID record. It starts unassigned with no pages."
+          subtitle={
+            isAdmin
+              ? "Create a new Facebook ID record. It starts unassigned with no pages."
+              : "Create a new Facebook ID record. It will be assigned to you automatically."
+          }
           closeHref="/dashboard/facebook-ids"
         >
           <form action={createFacebookIdAction} className="space-y-3">

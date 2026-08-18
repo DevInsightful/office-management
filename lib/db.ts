@@ -226,6 +226,36 @@ async function bootstrap() {
   `;
 
   await sql`
+    alter table users
+    add column if not exists personal_email text;
+  `;
+
+  await sql`
+    alter table users
+    add column if not exists bank_account_no text;
+  `;
+
+  await sql`
+    alter table users
+    add column if not exists bank_iban text;
+  `;
+
+  await sql`
+    alter table users
+    add column if not exists bank_name text;
+  `;
+
+  await sql`
+    alter table users
+    add column if not exists account_title text;
+  `;
+
+  await sql`
+    alter table users
+    add column if not exists profile_details_updated_at timestamptz;
+  `;
+
+  await sql`
     create table if not exists facebook_ids (
       id serial primary key,
       email text not null unique,
