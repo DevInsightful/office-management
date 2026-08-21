@@ -31,11 +31,13 @@ type OrderRow = {
   payment_method: string;
   description: string;
   image_url: string;
+  commission_amount: string;
   status: OrderStatus;
   created_at: string;
   updated_at: string;
   csr_user_id: number;
   csr_name: string;
+  csr_role: "super_admin" | "admin" | "employee";
 };
 
 export type OrdersData = {
@@ -65,11 +67,13 @@ export type OrdersData = {
     paymentMethod: string;
     description: string;
     imageUrl: string;
+    commissionAmount: number;
     status: OrderStatus;
     createdAt: string;
     updatedAt: string;
     csrUserId: number;
     csrName: string;
+    csrRole: "super_admin" | "admin" | "employee";
   }[];
 };
 
@@ -103,11 +107,13 @@ export async function getOrdersData(user: SessionUser): Promise<OrdersData> {
             o.payment_method,
             o.description,
             o.image_url,
+            o.commission_amount::text,
             o.status,
             o.created_at::text,
             o.updated_at::text,
             o.csr_user_id,
-            u.full_name as csr_name
+            u.full_name as csr_name,
+            u.role as csr_role
           from orders o
           join users u on u.id = o.csr_user_id
           where o.csr_user_id = ${user.id}
@@ -133,11 +139,13 @@ export async function getOrdersData(user: SessionUser): Promise<OrdersData> {
             o.payment_method,
             o.description,
             o.image_url,
+            o.commission_amount::text,
             o.status,
             o.created_at::text,
             o.updated_at::text,
             o.csr_user_id,
-            u.full_name as csr_name
+            u.full_name as csr_name,
+            u.role as csr_role
           from orders o
           join users u on u.id = o.csr_user_id
           order by o.created_at desc
@@ -162,11 +170,13 @@ export async function getOrdersData(user: SessionUser): Promise<OrdersData> {
     paymentMethod: row.payment_method,
     description: row.description,
     imageUrl: buildPublicStorageUrl(row.image_url),
+    commissionAmount: Number(row.commission_amount),
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     csrUserId: row.csr_user_id,
     csrName: row.csr_name,
+    csrRole: row.csr_role,
   }));
 
   return {

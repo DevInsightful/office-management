@@ -479,8 +479,14 @@ export function EmployeesDirectoryClient({
                   <td className="py-3">
                     {employee.role === "super_admin" || (!canManageAdmins && employee.role === "admin") ? (
                       <span className="text-sm text-slate-400">-</span>
-                    ) : (
+                   ) : (
                       <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={`/dashboard/employees/${employee.id}`}
+                          className="inline-flex rounded-xl border border-sky-200 px-3 py-2 text-xs font-semibold text-sky-800 transition hover:bg-sky-50"
+                        >
+                          View
+                        </Link>
                         <Link
                           href={`/dashboard/employees?modal=edit-user&user=${employee.id}`}
                           className="inline-flex rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
@@ -518,6 +524,7 @@ type OrderRow = {
   bookingDate: string;
   deliveryDate: string;
   total: number;
+  commissionAmount: number;
   status: string;
   imageUrl: string;
   createdAt: string;
@@ -548,6 +555,7 @@ export function OrdersTableClient({
           order.bookingDate,
           order.deliveryDate,
           order.total,
+          canManageStatus ? order.commissionAmount : null,
           order.status,
         ),
       )
@@ -601,7 +609,7 @@ export function OrdersTableClient({
       />
       <Panel title="All Orders" subtitle="Order list with row click details and instant status updates for managers.">
         <div className="max-w-full overflow-x-auto">
-          <table className="min-w-[980px] table-fixed text-sm">
+          <table className={`table-fixed text-sm ${canManageStatus ? "min-w-[1080px]" : "min-w-[980px]"}`}>
             <thead className="text-left text-slate-500">
               <tr>
                 <th className="w-[14%] pb-3 pr-3 font-medium"><SortButton label="CSR" active={sort === "csrName"} direction={direction} onClick={() => toggleSort("csrName")} /></th>
@@ -610,6 +618,7 @@ export function OrdersTableClient({
                 <th className="w-[12%] pb-3 pr-3 font-medium"><SortButton label="Booking" active={sort === "bookingDate"} direction={direction} onClick={() => toggleSort("bookingDate")} /></th>
                 <th className="w-[12%] pb-3 pr-3 font-medium"><SortButton label="Delivery" active={sort === "deliveryDate"} direction={direction} onClick={() => toggleSort("deliveryDate")} /></th>
                 <th className="w-[10%] pb-3 pr-3 font-medium"><SortButton label="Total" active={sort === "total"} direction={direction} onClick={() => toggleSort("total")} /></th>
+                {canManageStatus ? <th className="w-[10%] pb-3 pr-3 font-medium">Commission</th> : null}
                 <th className="w-[12%] pb-3 pr-3 font-medium"><SortButton label="Status" active={sort === "status"} direction={direction} onClick={() => toggleSort("status")} /></th>
                 <th className="w-[10%] pb-3 pr-3 font-medium">Created</th>
                 <th className="w-[8%] pb-3 pr-3 font-medium">Image</th>
@@ -642,6 +651,7 @@ export function OrdersTableClient({
                   <td className="py-3 pr-3 text-slate-600">{order.bookingDate}</td>
                   <td className="py-3 pr-3 text-slate-600">{order.deliveryDate}</td>
                   <td className="py-3 pr-3 font-semibold">{currency(order.total, currencyCode)}</td>
+                  {canManageStatus ? <td className="py-3 pr-3 font-semibold text-slate-700">{currency(order.commissionAmount, currencyCode)}</td> : null}
                   <td className="py-3 pr-3">
                     {canManageStatus ? (
                       <form

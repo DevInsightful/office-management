@@ -1,4 +1,4 @@
-import { createOrderAction, deleteOrderAction, updateOrderAction } from "@/app/actions";
+import { createOrderAction, deleteOrderAction, updateOrderAction, updateOrderCommissionAction } from "@/app/actions";
 import { OrdersTableClient } from "@/app/dashboard/client-tables";
 import { OrderForm } from "@/app/dashboard/order-form";
 import { OrderCopyButton } from "@/app/dashboard/order-copy-button";
@@ -96,6 +96,7 @@ export default async function OrdersPage({
               <p><span className="font-semibold text-slate-900">Total:</span> {currency(selectedOrder.total, data.currency)}</p>
               <p><span className="font-semibold text-slate-900">Payment Method:</span> {selectedOrder.paymentMethod}</p>
               <p><span className="font-semibold text-slate-900">Status:</span> {selectedOrder.status}</p>
+              {canManageStatus ? <p><span className="font-semibold text-slate-900">Commission:</span> {currency(selectedOrder.commissionAmount, data.currency)}</p> : null}
               <p><span className="font-semibold text-slate-900">Description:</span> {selectedOrder.description || "No extra description."}</p>
             </div>
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
@@ -106,6 +107,30 @@ export default async function OrdersPage({
               />
             </div>
           </div>
+          {canManageStatus && selectedOrder.status === "delivered" && selectedOrder.csrRole === "employee" ? (
+            <form action={updateOrderCommissionAction} className="mt-4 rounded-3xl border border-slate-200 bg-white p-4">
+              <input type="hidden" name="orderId" value={selectedOrder.id} />
+              <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Commission for CSR</label>
+                  <input
+                    name="commissionAmount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    defaultValue={selectedOrder.commissionAmount}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-amber-400"
+                  />
+                </div>
+                <PendingSubmitButton
+                  idleLabel="Save commission"
+                  pendingLabel="Saving..."
+                  className="inline-flex items-center justify-center gap-3 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  pendingClassName="cursor-not-allowed bg-slate-700 hover:bg-slate-700"
+                />
+              </div>
+            </form>
+          ) : null}
         </ModalFrame>
       )}
 

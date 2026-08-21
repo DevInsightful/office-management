@@ -672,6 +672,82 @@ export async function markSalaryPaidAction(formData: FormData) {
   revalidatePath("/dashboard/payroll");
 }
 
+export async function createStaffPaymentAction(formData: FormData) {
+  const actor = await requireAdmin();
+
+  const recipientUserId = cleanNumber(formData.get("recipientUserId"));
+  const amountPaid = cleanNumber(formData.get("amountPaid"));
+  const paidOn = cleanDate(formData.get("paidOn"));
+  const primaryEmail = cleanText(formData.get("primaryEmail")).toLowerCase();
+  const secondaryEmail = cleanText(formData.get("secondaryEmail")).toLowerCase();
+  const accountTitle = cleanText(formData.get("accountTitle"));
+  const bankAccountNo = cleanText(formData.get("bankAccountNo"));
+  const bankIban = cleanText(formData.get("bankIban")).toUpperCase();
+  const bankName = cleanText(formData.get("bankName"));
+  const purpose = cleanText(formData.get("purpose"));
+
+  if (!recipientUserId || amountPaid <= 0 || !paidOn || !primaryEmail) {
+    redirect("/dashboard/payroll?error=invalid_staff_payment");
+  }
+
+  const users = await sql<{
+    id: number;
+    full_name: string;
+    email: string;
+    role: "super_admin" | "admin" | "employee";
+    active: boolean;
+  }[]>`
+    select id, full_name, email, role, active
+    from users
+    where id = ${recipientUserId}
+    limit 1
+  `;
+
+  const target = users[0];
+
+  if (!target || !target.active || target.role === "super_admin") {
+    redirect("/dashboard/payroll?error=invalid_staff_payment_target");
+  }
+
+  await sql`
+    insert into staff_payments (
+      recipient_user_id,
+      paid_by_user_id,
+      recipient_name,
+      recipient_role,
+      primary_email,
+      secondary_email,
+      account_title,
+      bank_account_no,
+      bank_iban,
+      bank_name,
+      amount_paid,
+      paid_on,
+      purpose
+    )
+    values (
+      ${recipientUserId},
+      ${actor.id},
+      ${target.full_name},
+      ${target.role},
+      ${primaryEmail},
+      ${secondaryEmail || null},
+      ${accountTitle || null},
+      ${bankAccountNo || null},
+      ${bankIban || null},
+      ${bankName || null},
+      ${amountPaid},
+      ${paidOn},
+      ${purpose}
+    )
+  `;
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/payroll");
+  revalidatePath(`/dashboard/employees/${recipientUserId}`);
+  redirect("/dashboard/payroll");
+}
+
 export async function createOrderAction(formData: FormData) {
   const actor = await requireUser();
 
@@ -797,6 +873,41 @@ export async function updateOrderStatusAction(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/orders");
+}
+
+export async function updateOrderCommissionAction(formData: FormData) {
+  await requireAdmin();
+
+  const orderId = cleanNumber(formData.get("orderId"));
+  const commissionAmount = cleanNumber(formData.get("commissionAmount"));
+
+  if (!orderId || commissionAmount < 0) {
+    redirect("/dashboard/orders?error=invalid_order_commission");
+  }
+
+  const rows = await sql<{ status: string; csr_role: "admin" | "employee" | "super_admin" }[]>`
+    select o.status, u.role as csr_role
+    from orders o
+    join users u on u.id = o.csr_user_id
+    where o.id = ${orderId}
+    limit 1
+  `;
+
+  const order = rows[0];
+
+  if (!order || order.status !== "delivered" || order.csr_role !== "employee") {
+    redirect("/dashboard/orders?error=commission_requires_delivered");
+  }
+
+  await sql`
+    update orders
+    set commission_amount = ${commissionAmount}, updated_at = now()
+    where id = ${orderId}
+  `;
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/orders");
+  redirect(`/dashboard/orders?modal=details&order=${orderId}`);
 }
 
 export async function updateOrderAction(formData: FormData) {

@@ -73,3 +73,24 @@ model AttendanceAttempt {
   @@index([ipAddress, requestedAt(sort: Desc)])
   @@map("attendance_attempts")
 }
+
+model StaffPayment {
+  id             Int      @id @default(autoincrement())
+  recipientUserId Int     @map("recipient_user_id")
+  paidByUserId   Int      @map("paid_by_user_id")
+  recipientName  String   @map("recipient_name")
+  recipientRole  String   @map("recipient_role")
+  primaryEmail   String   @map("primary_email")
+  secondaryEmail String?  @map("secondary_email")
+  accountTitle   String?  @map("account_title")
+  bankAccountNo  String?  @map("bank_account_no")
+  bankIban       String?  @map("bank_iban")
+  bankName       String?  @map("bank_name")
+  amountPaid     Decimal  @map("amount_paid") @db.Decimal(12, 2)
+  paidOn         DateTime @map("paid_on") @db.Date
+  purpose        String   @default("")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([recipientUserId, paidOn(sort: Desc), id(sort: Desc)])
+  @@map("staff_payments")
+}
