@@ -82,7 +82,7 @@ export default async function EmployeesPage({
       {modal === "edit-user" && selectedUser && (
         <ModalFrame
           title={`Edit ${selectedUser.fullName}`}
-          subtitle="Update employee or admin details. Leave password empty to keep the current password."
+          subtitle="Update employee or admin details. Admins can reset an employee password here by entering a new one. Leave it empty to keep the current password."
           closeHref="/dashboard/employees"
         >
           <form action={updateUserAction} className="space-y-3">
@@ -105,8 +105,8 @@ export default async function EmployeesPage({
             <Field label="Email">
               <input name="email" type="email" defaultValue={selectedUser.email} className={inputClass} />
             </Field>
-            <Field label="New password (optional)">
-              <input name="password" type="text" placeholder="Leave blank to keep current password" className={inputClass} />
+            <Field label="Reset password (optional)">
+              <input name="password" type="text" placeholder="Enter a new password to reset it, or leave blank to keep current password" className={inputClass} />
             </Field>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Joined on">
@@ -128,8 +128,8 @@ export default async function EmployeesPage({
               </label>
             )}
             <PendingSubmitButton
-              idleLabel="Update user"
-              pendingLabel="Updating user..."
+              idleLabel="Update user / reset password"
+              pendingLabel="Saving changes..."
               className={`${primaryButton} gap-3`}
               pendingClassName="cursor-not-allowed bg-slate-700 hover:bg-slate-700"
             />
