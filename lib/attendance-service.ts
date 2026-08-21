@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getAttendanceDecision } from "@/lib/attendance-policy";
 import { getAttendanceConfig } from "@/lib/config";
 import { calculateDistanceMeters } from "@/lib/haversine";
 import { distanceToPolygonMeters, isPointInsidePolygon } from "@/lib/geofence";
@@ -228,6 +229,23 @@ export async function checkInAttendance(
     };
   }
 
+  const attendanceDecision = getAttendanceDecision(now);
+
+  if (!attendanceDecision.allowed) {
+    await logAttempt({
+      ...payload,
+      officeRadius: config.officeRadiusMeters,
+      result: "blocked_cutoff",
+      message: attendanceDecision.message,
+    });
+
+    return {
+      success: false,
+      message: attendanceDecision.message,
+      status: 403,
+    };
+  }
+
   // Distance is always calculated on the backend; the frontend is advisory only.
   const point = {
     latitude: payload.latitude,
@@ -279,19 +297,32 @@ export async function checkInAttendance(
 
   // The successful transaction writes both the audit record and the approved attendance row.
   await prisma.$transaction([
-    prisma.attendance.create({
-      data: {
-        employeeId: payload.employeeId,
-        checkInTime: now,
-        latitude: payload.latitude,
-        longitude: payload.longitude,
-        accuracy: payload.accuracy,
-        distanceFromOffice: distance,
-        officeRadius: allowedBoundaryMeters,
-        ipAddress: payload.ipAddress ?? undefined,
-        userAgent: payload.userAgent ?? undefined,
-      },
-    }),
+    prisma.$executeRaw`
+      insert into attendance_records (
+        employee_id,
+        check_in_time,
+        latitude,
+        longitude,
+        accuracy,
+        distance_from_office,
+        office_radius,
+        ip_address,
+        user_agent,
+        status
+      )
+      values (
+        ${payload.employeeId},
+        ${now},
+        ${payload.latitude},
+        ${payload.longitude},
+        ${payload.accuracy},
+        ${distance},
+        ${allowedBoundaryMeters},
+        ${payload.ipAddress},
+        ${payload.userAgent},
+        ${attendanceDecision.attendanceStatus}
+      )
+    `,
     prisma.attendanceAttempt.create({
       data: {
         employeeId: payload.employeeId,
@@ -302,8 +333,8 @@ export async function checkInAttendance(
         officeRadius: allowedBoundaryMeters,
         ipAddress: payload.ipAddress ?? undefined,
         userAgent: payload.userAgent ?? undefined,
-        result: "allowed",
-        message: "Attendance marked successfully.",
+        result: attendanceDecision.attendanceStatus === "half_day" ? "allowed_half_day" : "allowed",
+        message: attendanceDecision.message,
       },
     }),
   ]);
@@ -311,7 +342,7 @@ export async function checkInAttendance(
   return {
     success: true,
     distance,
-    message: "Attendance marked successfully.",
+    message: attendanceDecision.message,
     status: 200,
   };
 }

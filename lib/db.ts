@@ -101,8 +101,31 @@ async function bootstrap() {
       office_radius integer,
       ip_address varchar(128),
       user_agent text,
+      status text not null default 'present' check (status in ('present', 'half_day')),
       created_at timestamptz not null default now()
     );
+  `;
+
+  await sql`
+    alter table attendance_records
+    add column if not exists status text not null default 'present';
+  `;
+
+  await sql`
+    update attendance_records
+    set status = 'present'
+    where status is null;
+  `;
+
+  await sql`
+    alter table attendance_records
+    drop constraint if exists attendance_records_status_check;
+  `;
+
+  await sql`
+    alter table attendance_records
+    add constraint attendance_records_status_check
+    check (status in ('present', 'half_day'));
   `;
 
   await sql`

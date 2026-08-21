@@ -11,6 +11,7 @@ import {
   requireUser,
   verifyPassword,
 } from "@/lib/auth";
+import { getAttendanceDecision, getKarachiTodayIsoDate } from "@/lib/attendance-policy";
 import { ensureDb, sql } from "@/lib/db";
 import { seedIfEmpty } from "@/lib/seed";
 import { SUPPORTED_CURRENCIES } from "@/lib/currency";
@@ -31,7 +32,7 @@ function cleanNumber(value: FormDataEntryValue | null) {
 
 function cleanDate(value: FormDataEntryValue | null) {
   const parsed = cleanText(value);
-  return parsed || new Date().toISOString().slice(0, 10);
+  return parsed || getKarachiTodayIsoDate(new Date());
 }
 
 export async function updateCurrencyAction(formData: FormData) {
@@ -391,11 +392,19 @@ export async function markAttendanceByAdminAction(formData: FormData) {
     redirect("/dashboard/attendance?error=forbidden");
   }
 
+  const now = new Date();
+  const todayInKarachi = getKarachiTodayIsoDate(now);
+  const attendanceDecision = getAttendanceDecision(now);
+
+  if (attendanceDate === todayInKarachi && !attendanceDecision.allowed) {
+    redirect("/dashboard/attendance?error=attendance_cutoff_passed");
+  }
+
   const existing = await sql<{ id: number }[]>`
     select id
     from attendance_records
     where employee_id = ${userId}
-      and check_in_time::date = ${attendanceDate}::date
+      and timezone('Asia/Karachi', check_in_time)::date = ${attendanceDate}::date
     limit 1
   `;
 
@@ -405,13 +414,15 @@ export async function markAttendanceByAdminAction(formData: FormData) {
         employee_id,
         check_in_time,
         office_radius,
-        user_agent
+        user_agent,
+        status
       )
       values (
         ${userId},
-        (${attendanceDate}::date + time '09:00')::timestamptz,
+        (${attendanceDate}::date + time '09:00') at time zone 'Asia/Karachi',
         0,
-        ${`Marked manually by ${actor.fullName} (${actor.role})`}
+        ${`Marked manually by ${actor.fullName} (${actor.role})`},
+        ${attendanceDate === todayInKarachi ? attendanceDecision.attendanceStatus : "present"}
       )
     `;
   }

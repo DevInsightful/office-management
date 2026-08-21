@@ -865,10 +865,23 @@ type AttendanceReportEntry = {
   employee_id: number;
   attendance_date: string;
   check_in_at: string;
+  status: "present" | "half_day";
   full_name: string;
   accuracy: number | null;
   distanceFromOffice: number | null;
 };
+
+function getAttendanceStatusClasses(status: "present" | "half_day" | "absent") {
+  if (status === "present") {
+    return "bg-emerald-100 text-emerald-700";
+  }
+
+  if (status === "half_day") {
+    return "bg-amber-100 text-amber-800";
+  }
+
+  return "bg-rose-100 text-rose-700";
+}
 
 export function PerformanceTableClient({ rows }: { rows: PerformanceRow[] }) {
   const [search, setSearch] = useState("");
@@ -1078,7 +1091,7 @@ export function AttendanceReportClient({
 
       return days.map((day) => {
         const match = attendanceByEmployeeAndDate.get(`${employee.id}-${day}`);
-        const status = match ? "present" : "absent";
+        const status: "present" | "half_day" | "absent" = match?.status ?? "absent";
 
         return {
           key: `${employee.id}-${day}`,
@@ -1115,12 +1128,14 @@ export function AttendanceReportClient({
           acc.total += 1;
           if (row.status === "present") {
             acc.present += 1;
+          } else if (row.status === "half_day") {
+            acc.halfDay += 1;
           } else {
             acc.absent += 1;
           }
           return acc;
         },
-        { total: 0, present: 0, absent: 0 },
+        { total: 0, present: 0, halfDay: 0, absent: 0 },
       ),
     [attendanceRows],
   );
@@ -1149,6 +1164,7 @@ export function AttendanceReportClient({
       <section className="grid gap-4 md:grid-cols-3">
         <MetricCard label="Rows In Period" value={String(totals.total)} tone="sky" />
         <MetricCard label="Present" value={String(totals.present)} tone="emerald" />
+        <MetricCard label="Half Day" value={String(totals.halfDay)} tone="amber" />
         <MetricCard label="Absent" value={String(totals.absent)} tone="rose" />
       </section>
 
@@ -1228,7 +1244,7 @@ export function AttendanceReportClient({
 
       <Panel
         title="Attendance Report"
-        subtitle={`Showing ${activeRange.from} to ${activeRange.to}. Employees without a check-in in this range are marked absent.`}
+        subtitle={`Showing ${activeRange.from} to ${activeRange.to}. Employees without a check-in are absent, and late approved check-ins show as half day.`}
       >
         <div className="max-w-full overflow-x-auto">
           <table className="min-w-[900px] table-fixed text-sm">
@@ -1251,7 +1267,7 @@ export function AttendanceReportClient({
                     <td className="py-3 pr-3">
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] ${
-                          row.status === "present" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+                          getAttendanceStatusClasses(row.status)
                         }`}
                       >
                         {row.status}
@@ -1321,7 +1337,7 @@ export function AttendanceCalendarClient({
       : employeeOptions.find((employee) => employee.id === defaultEmployeeId) ?? selectedEmployee;
 
   const attendanceDates = useMemo(() => {
-    const dates = new Set<string>();
+    const dates = new Map<string, "present" | "half_day">();
 
     for (const entry of attendance) {
       if (!effectiveEmployee || entry.employee_id !== effectiveEmployee.id) {
@@ -1329,7 +1345,7 @@ export function AttendanceCalendarClient({
       }
 
       if (entry.attendance_date >= monthStart && entry.attendance_date <= monthEnd) {
-        dates.add(entry.attendance_date);
+        dates.set(entry.attendance_date, entry.status);
       }
     }
 
@@ -1344,14 +1360,14 @@ export function AttendanceCalendarClient({
     const effectiveStart = effectiveEmployee.joinedOn > monthStart ? effectiveEmployee.joinedOn : monthStart;
     return listDays(effectiveStart, monthEnd).map((date) => ({
       date,
-      status: attendanceDates.has(date) ? "present" : "absent",
+      status: attendanceDates.get(date) ?? "absent",
       isToday: date === today,
     }));
   }, [attendanceDates, effectiveEmployee, monthEnd, monthStart, today]);
 
   return (
     <section className="grid gap-4">
-      <Panel title="Attendance Calendar" subtitle="Current month calendar for one staff member. Present days turn green; missing days stay absent.">
+      <Panel title="Attendance Calendar" subtitle="Current month calendar for one staff member. Present is green, half day is amber, and missing days stay absent.">
         <div className={`grid gap-3 ${allowEmployeeSelect ? "lg:grid-cols-[260px_1fr]" : "lg:grid-cols-1"}`}>
           {allowEmployeeSelect ? (
             <Field label="Employee">
@@ -1371,6 +1387,8 @@ export function AttendanceCalendarClient({
                 className={`rounded-2xl border p-3 text-sm ${
                   day.status === "present"
                     ? "border-emerald-200 bg-emerald-50"
+                    : day.status === "half_day"
+                      ? "border-amber-200 bg-amber-50"
                     : "border-rose-200 bg-rose-50"
                 } ${day.isToday ? "ring-2 ring-amber-300" : ""}`}
               >

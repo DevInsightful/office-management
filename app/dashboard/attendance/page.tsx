@@ -3,11 +3,12 @@ import { AttendanceCheckIn } from "@/app/dashboard/attendance-check-in";
 import { AttendanceCalendarClient, AttendanceReportClient } from "@/app/dashboard/client-tables";
 import { PendingSubmitButton } from "@/app/pending-controls";
 import { Field, PageIntro, Panel, inputClass, primaryButton } from "@/app/ui";
+import { getKarachiTodayIsoDate } from "@/lib/attendance-policy";
 import { requireUser } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
 
 export default async function AttendancePage() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getKarachiTodayIsoDate(new Date());
   const user = await requireUser();
   const data = await getDashboardData(user);
   const trackedEmployees = data.employees.map((employee) => ({
@@ -36,19 +37,19 @@ export default async function AttendancePage() {
         description={
           user.role === "super_admin"
             ? "Review office attendance by calendar and report filters. Super admin is excluded from attendance marking."
-            : "Use this page to mark today’s attendance with GPS and review present or absent days in a dedicated calendar and report."
+            : "Use this page to mark today’s attendance with GPS. Check-in until 3:15 PM PKT is present, later approved check-ins become half day, and final cutoffs mark the day absent."
         }
       />
 
       <section className="grid gap-4">
         {user.role !== "super_admin" ? (
-          <Panel title="Today Check-In" subtitle="When check-in succeeds, today is marked present for your account.">
+          <Panel title="Today Check-In" subtitle="Until 3:15 PM PKT check-in is present. After that it becomes half day until 4:00 PM PKT, or 4:15 PM PKT on Friday.">
             <AttendanceCheckIn />
           </Panel>
         ) : null}
 
         {user.role !== "employee" ? (
-          <Panel title="Manual Attendance" subtitle="If GPS fails, admin can mark attendance manually for employees. Super admin can also mark admins.">
+          <Panel title="Manual Attendance" subtitle="If GPS fails, admin can mark attendance manually. Today still follows the same PKT cutoff rules before a record can be added.">
             <form action={markAttendanceByAdminAction} className="grid gap-3 lg:grid-cols-[1fr_220px_auto]">
               <Field label="Employee">
                 <select name="userId" className={inputClass}>

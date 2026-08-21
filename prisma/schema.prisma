@@ -47,6 +47,7 @@ model Attendance {
   officeRadius       Int?      @map("office_radius")
   ipAddress          String?   @map("ip_address") @db.VarChar(128)
   userAgent          String?   @map("user_agent")
+  status             String    @default("present")
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([employeeId, checkInTime(sort: Desc)])

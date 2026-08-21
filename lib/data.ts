@@ -131,6 +131,7 @@ type AttendanceRow = {
   employee_id: number;
   attendance_date: string;
   check_in_at: string;
+  status: "present" | "half_day";
   full_name: string;
   accuracy: number | null;
   distanceFromOffice: number | null;
@@ -141,6 +142,7 @@ type AttendanceSqlRow = {
   employee_id: number;
   attendance_date: string;
   check_in_at: string;
+  status: "present" | "half_day";
   full_name: string;
   accuracy: string | null;
   distance_from_office: string | null;
@@ -319,8 +321,9 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
           select
             a.id,
             a.employee_id,
-            a.check_in_time::date::text as attendance_date,
+            timezone('Asia/Karachi', a.check_in_time)::date::text as attendance_date,
             to_char(a.check_in_time at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as check_in_at,
+            a.status,
             u.full_name,
             a.accuracy::text,
             a.distance_from_office::text
@@ -334,8 +337,9 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
           select
             a.id,
             a.employee_id,
-            a.check_in_time::date::text as attendance_date,
+            timezone('Asia/Karachi', a.check_in_time)::date::text as attendance_date,
             to_char(a.check_in_time at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as check_in_at,
+            a.status,
             u.full_name,
             a.accuracy::text,
             a.distance_from_office::text
