@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getAttendanceDecision, getKarachiTodayIsoDate, getNonWorkingDayStatus } from "@/lib/attendance-policy";
+import { getAttendanceDecision, getOfficeTodayIsoDate, getNonWorkingDayStatus, OFFICE_TIME_ZONE } from "@/lib/attendance-policy";
 import { getAttendanceHoliday } from "@/lib/attendance-holidays";
 import { getAttendanceConfig } from "@/lib/config";
 import { calculateDistanceMeters } from "@/lib/haversine";
@@ -29,24 +29,18 @@ function roundToSingleDecimal(value: number) {
   return Math.round(value * 10) / 10;
 }
 
-function getKarachiDayBounds(date: Date) {
-  const karachiOffsetMs = 5 * 60 * 60 * 1000;
-  const localTime = new Date(date.getTime() + karachiOffsetMs);
-
-  const dayStartLocal = Date.UTC(
-    localTime.getUTCFullYear(),
-    localTime.getUTCMonth(),
-    localTime.getUTCDate(),
-    0,
-    0,
-    0,
-    0,
-  );
-
-  return {
-    start: new Date(dayStartLocal - karachiOffsetMs),
-    end: new Date(dayStartLocal - karachiOffsetMs + 24 * 60 * 60 * 1000),
-  };
+function getOfficeDayBounds(date: Date) {
+  const dateParts = new Intl.DateTimeFormat("en-CA", { timeZone: OFFICE_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const lookup = Object.fromEntries(dateParts.map((part) => [part.type, part.value]));
+  const year = Number(lookup.year);
+  const month = Number(lookup.month);
+  const day = Number(lookup.day);
+  const noonUtc = new Date(Date.UTC(year, month - 1, day, 12));
+  const zoneName = new Intl.DateTimeFormat("en-US", { timeZone: OFFICE_TIME_ZONE, timeZoneName: "longOffset" }).formatToParts(noonUtc).find((part) => part.type === "timeZoneName")?.value ?? "GMT";
+  const offset = zoneName.match(/^GMT([+-])(\d{2}):(\d{2})$/);
+  const offsetMinutes = offset ? (Number(offset[2]) * 60 + Number(offset[3])) * (offset[1] === "+" ? 1 : -1) : 0;
+  const start = new Date(Date.UTC(year, month - 1, day) - offsetMinutes * 60_000);
+  return { start, end: new Date(start.getTime() + 24 * 60 * 60 * 1000) };
 }
 
 // Every attempt is audited so rejected requests still leave a trail for abuse review.
@@ -170,9 +164,9 @@ export async function checkInAttendance(
   }
 
   const now = new Date();
-  const todayInKarachi = getKarachiTodayIsoDate(now);
-  const holiday = await getAttendanceHoliday(todayInKarachi);
-  const nonWorkingStatus = getNonWorkingDayStatus(todayInKarachi, holiday ? [todayInKarachi] : []);
+  const todayInOffice = getOfficeTodayIsoDate(now);
+  const holiday = await getAttendanceHoliday(todayInOffice);
+  const nonWorkingStatus = getNonWorkingDayStatus(todayInOffice, holiday ? [todayInOffice] : []);
 
   if (nonWorkingStatus) {
     const message = nonWorkingStatus === "holiday"
@@ -183,7 +177,7 @@ export async function checkInAttendance(
   }
 
   const rateLimitCutoff = new Date(now.getTime() - config.rateLimitWindowMinutes * 60_000);
-  const attendanceDay = getKarachiDayBounds(now);
+  const attendanceDay = getOfficeDayBounds(now);
 
   // Rate limiting and duplicate-day checks happen before distance computation.
   const [recentAttemptCount, recentAttendance] = await Promise.all([

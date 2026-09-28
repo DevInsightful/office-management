@@ -1,10 +1,11 @@
-export const OFFICE_TIME_ZONE = "Asia/Karachi";
+// Attendance follows the office's local calendar day.
+export const OFFICE_TIME_ZONE = "America/Los_Angeles";
 export const DEFAULT_WEEKEND_DAY = "Sun";
 
 export type AttendanceStatus = "present" | "half_day";
 export type AttendanceDisplayStatus = AttendanceStatus | "absent" | "weekend" | "holiday";
 
-function getKarachiDateParts(date: Date) {
+function getOfficeDateParts(date: Date) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: OFFICE_TIME_ZONE,
     year: "numeric", month: "2-digit", day: "2-digit", weekday: "short",
@@ -14,32 +15,27 @@ function getKarachiDateParts(date: Date) {
   return { isoDate: `${lookup.year}-${lookup.month}-${lookup.day}`, weekday: lookup.weekday, hour: Number(lookup.hour), minute: Number(lookup.minute) };
 }
 
-export function getKarachiTodayIsoDate(date: Date) { return getKarachiDateParts(date).isoDate; }
+export function getOfficeTodayIsoDate(date: Date) { return getOfficeDateParts(date).isoDate; }
 
 export function getAttendanceDecision(date: Date) {
-  const karachi = getKarachiDateParts(date);
-  const totalMinutes = karachi.hour * 60 + karachi.minute;
-  const isFriday = karachi.weekday === "Fri";
+  const office = getOfficeDateParts(date);
+  const totalMinutes = office.hour * 60 + office.minute;
+  const isFriday = office.weekday === "Fri";
   const presentLimitMinutes = isFriday ? 16 * 60 + 30 : 15 * 60 + 20;
   const halfDayLimitMinutes = isFriday ? 17 * 60 : 16 * 60;
 
   if (totalMinutes <= presentLimitMinutes) return { allowed: true, attendanceStatus: "present" as AttendanceStatus, message: "Attendance marked successfully." };
   if (totalMinutes <= halfDayLimitMinutes) return { allowed: true, attendanceStatus: "half_day" as AttendanceStatus, message: "Attendance marked as half day due to late check-in." };
-  return {
-    allowed: false,
-    cutoffMinutes: halfDayLimitMinutes,
-    message: `Attendance cannot be marked after ${isFriday ? "5:00 PM PKT on Friday" : "4:00 PM PKT on working days"}. You are marked absent for today.`,
-  };
+  return { allowed: false, cutoffMinutes: halfDayLimitMinutes, message: `Attendance cannot be marked after ${isFriday ? "5:00 PM on Friday" : "4:00 PM on working days"}. You are marked absent for today.` };
 }
 
 export function getNonWorkingDayStatus(isoDate: string, holidayDates: Iterable<string>): "weekend" | "holiday" | null {
   if (new Set(holidayDates).has(isoDate)) return "holiday";
-  // ISO dates use UTC here so browser timezone cannot change the calendar day.
   return new Date(`${isoDate}T00:00:00Z`).getUTCDay() === 0 ? "weekend" : null;
 }
 
 export function formatAttendanceDate(isoDate: string) {
-  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "2-digit", month: "short", year: "numeric", weekday: "long" }).formatToParts(new Date(`${isoDate}T00:00:00Z`));
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "2-digit", weekday: "short" }).formatToParts(new Date(`${isoDate}T00:00:00Z`));
   const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${lookup.day} ${lookup.month} ${lookup.year} — ${lookup.weekday}`;
+  return `${[lookup.day, lookup.month, lookup.year].join("/")} - ${lookup.weekday}`;
 }

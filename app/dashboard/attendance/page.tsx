@@ -3,12 +3,12 @@ import { AttendanceCheckIn } from "@/app/dashboard/attendance-check-in";
 import { AttendanceCalendarClient, AttendanceReportClient } from "@/app/dashboard/client-tables";
 import { PendingSubmitButton } from "@/app/pending-controls";
 import { Field, PageIntro, Panel, inputClass, primaryButton } from "@/app/ui";
-import { formatAttendanceDate, getKarachiTodayIsoDate } from "@/lib/attendance-policy";
+import { formatAttendanceDate, getOfficeTodayIsoDate } from "@/lib/attendance-policy";
 import { requireUser } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
 
 export default async function AttendancePage() {
-  const today = getKarachiTodayIsoDate(new Date());
+  const today = getOfficeTodayIsoDate(new Date());
   const user = await requireUser();
   const data = await getDashboardData(user);
   const trackedEmployees = data.employees.map((employee) => ({

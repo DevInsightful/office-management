@@ -75,6 +75,24 @@ export default async function DashboardLayout({
             </form>
           </div>
         }
+        compactSidebar={
+          <div className="rounded-[1.5rem] border border-white/70 bg-white/85 p-2 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+            <div className="grid size-14 place-items-center rounded-2xl bg-slate-950 text-sm font-semibold text-white" title={`${user.fullName} (${user.role.replace("_", " ")})`}>
+              {user.fullName.split(" ").map((name) => name[0]).join("").slice(0, 2)}
+            </div>
+            <nav className="mt-3 space-y-2">
+              {nav.map((item) => <NavLink key={item.href} href={item.href} label={item.label} collapsed />)}
+            </nav>
+            <form action={logoutAction} className="mt-3">
+              <PendingSubmitButton
+                idleLabel="↪"
+                pendingLabel="…"
+                className="inline-flex w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-2 py-3 text-base font-semibold text-slate-900 transition hover:bg-slate-50"
+                pendingClassName="cursor-not-allowed bg-slate-100 text-slate-500 hover:bg-slate-100"
+              />
+            </form>
+          </div>
+        }
       >
         {children}
       </SidebarShell>

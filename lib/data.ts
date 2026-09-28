@@ -4,6 +4,7 @@ import { seedIfEmpty } from "@/lib/seed";
 import { CurrencyCode, currency } from "@/lib/currency";
 import { getCurrencySetting } from "@/lib/settings";
 import { getAttendanceHolidays } from "@/lib/attendance-holidays";
+import { OFFICE_TIME_ZONE } from "@/lib/attendance-policy";
 
 export type DashboardData = {
   user: SessionUser;
@@ -323,7 +324,7 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
           select
             a.id,
             a.employee_id,
-            timezone('Asia/Karachi', a.check_in_time)::date::text as attendance_date,
+            timezone(${OFFICE_TIME_ZONE}, a.check_in_time)::date::text as attendance_date,
             to_char(a.check_in_time at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as check_in_at,
             a.status,
             u.full_name,
@@ -339,7 +340,7 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
           select
             a.id,
             a.employee_id,
-            timezone('Asia/Karachi', a.check_in_time)::date::text as attendance_date,
+            timezone(${OFFICE_TIME_ZONE}, a.check_in_time)::date::text as attendance_date,
             to_char(a.check_in_time at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as check_in_at,
             a.status,
             u.full_name,

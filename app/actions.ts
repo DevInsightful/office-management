@@ -11,7 +11,7 @@ import {
   requireUser,
   verifyPassword,
 } from "@/lib/auth";
-import { getAttendanceDecision, getKarachiTodayIsoDate, getNonWorkingDayStatus } from "@/lib/attendance-policy";
+import { getAttendanceDecision, getOfficeTodayIsoDate, getNonWorkingDayStatus, OFFICE_TIME_ZONE } from "@/lib/attendance-policy";
 import { getAttendanceHoliday } from "@/lib/attendance-holidays";
 import { ensureDb, sql } from "@/lib/db";
 import { seedIfEmpty } from "@/lib/seed";
@@ -33,7 +33,7 @@ function cleanNumber(value: FormDataEntryValue | null) {
 
 function cleanDate(value: FormDataEntryValue | null) {
   const parsed = cleanText(value);
-  return parsed || getKarachiTodayIsoDate(new Date());
+  return parsed || getOfficeTodayIsoDate(new Date());
 }
 
 export async function updateCurrencyAction(formData: FormData) {
@@ -394,7 +394,7 @@ export async function markAttendanceByAdminAction(formData: FormData) {
   }
 
   const now = new Date();
-  const todayInKarachi = getKarachiTodayIsoDate(now);
+  const todayInOffice = getOfficeTodayIsoDate(now);
   const attendanceDecision = getAttendanceDecision(now);
   const holiday = await getAttendanceHoliday(attendanceDate);
   const nonWorkingStatus = getNonWorkingDayStatus(attendanceDate, holiday ? [attendanceDate] : []);
@@ -403,7 +403,7 @@ export async function markAttendanceByAdminAction(formData: FormData) {
     redirect(`/dashboard/attendance?error=${nonWorkingStatus}_attendance_not_required`);
   }
 
-  if (attendanceDate === todayInKarachi && !attendanceDecision.allowed) {
+  if (attendanceDate === todayInOffice && !attendanceDecision.allowed) {
     redirect("/dashboard/attendance?error=attendance_cutoff_passed");
   }
 
@@ -411,7 +411,7 @@ export async function markAttendanceByAdminAction(formData: FormData) {
     select id
     from attendance_records
     where employee_id = ${userId}
-      and timezone('Asia/Karachi', check_in_time)::date = ${attendanceDate}::date
+      and timezone(${OFFICE_TIME_ZONE}, check_in_time)::date = ${attendanceDate}::date
     limit 1
   `;
 
@@ -426,10 +426,10 @@ export async function markAttendanceByAdminAction(formData: FormData) {
       )
       values (
         ${userId},
-        (${attendanceDate}::date + time '09:00') at time zone 'Asia/Karachi',
+        (${attendanceDate}::date + time '09:00') at time zone ${OFFICE_TIME_ZONE},
         0,
         ${`Marked manually by ${actor.fullName} (${actor.role})`},
-        ${attendanceDate === todayInKarachi ? attendanceDecision.attendanceStatus : "present"}
+        ${attendanceDate === todayInOffice ? attendanceDecision.attendanceStatus : "present"}
       )
     `;
   }

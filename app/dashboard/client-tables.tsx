@@ -25,12 +25,16 @@ import { Badge, Field, MetricCard, Panel, PriorityBadge, currency, inputClass, p
 import { findCsvColumnIndex } from "@/lib/csv";
 import { FACEBOOK_ID_STATUS_OPTIONS, validateFacebookIdRow } from "@/lib/facebook-id-validation";
 import { parseTabularFile } from "@/lib/spreadsheet";
-import { AttendanceDisplayStatus, formatAttendanceDate, getNonWorkingDayStatus } from "@/lib/attendance-policy";
+import { AttendanceDisplayStatus, formatAttendanceDate, getNonWorkingDayStatus, OFFICE_TIME_ZONE } from "@/lib/attendance-policy";
 
 type SortDirection = "asc" | "desc";
 
 function formatDateTime(value: string | Date) {
   return new Date(value).toLocaleString("en-GB", { timeZone: "Asia/Karachi" });
+}
+
+function formatAttendanceDateTime(value: string | Date) {
+  return new Date(value).toLocaleString("en-GB", { timeZone: OFFICE_TIME_ZONE });
 }
 
 function formatDate(value: string | Date) {
@@ -1291,7 +1295,7 @@ export function AttendanceReportClient({
                       </span>
                     </td>
                     <td className="py-3 pr-3 text-slate-600">
-                      {row.check_in_at ? formatDateTime(row.check_in_at) : "-"}
+                      {row.check_in_at ? formatAttendanceDateTime(row.check_in_at) : "-"}
                     </td>
                     <td className="py-3 pr-3 text-slate-600">
                       {row.distanceFromOffice !== null ? `${row.distanceFromOffice.toFixed(1)} m` : "-"}
@@ -1415,7 +1419,8 @@ export function AttendanceCalendarClient({
                       : "border-rose-200 bg-rose-50"
                 } ${day.isToday ? "ring-2 ring-amber-300" : ""}`}
               >
-                <p className="font-semibold text-slate-900">{formatAttendanceDate(day.date)}</p>
+                <p className="font-semibold text-slate-900">{formatAttendanceDate(day.date).split(" - ")[0]}</p>
+                <p className="mt-1 text-xs font-medium uppercase text-slate-600">{formatAttendanceDate(day.date).split(" - ")[1]}</p>
                 <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-600">{day.status}</p>
               </div>
             ))}

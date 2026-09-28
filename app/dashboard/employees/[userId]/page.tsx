@@ -4,7 +4,7 @@ import { ActionLink, Badge, MetricCard, PageIntro, Panel, PriorityBadge, currenc
 import { requireAdmin } from "@/lib/auth";
 import { ensureDb, sql } from "@/lib/db";
 import { getCurrencySetting } from "@/lib/settings";
-import { formatAttendanceDate } from "@/lib/attendance-policy";
+import { formatAttendanceDate, OFFICE_TIME_ZONE } from "@/lib/attendance-policy";
 
 type EmployeeProfileRow = {
   id: number;
@@ -90,6 +90,10 @@ function formatDateTime(value: string | Date) {
   return new Date(value).toLocaleString("en-GB", { timeZone: "Asia/Karachi" });
 }
 
+function formatAttendanceDateTime(value: string | Date) {
+  return new Date(value).toLocaleString("en-GB", { timeZone: OFFICE_TIME_ZONE });
+}
+
 function formatDate(value: string | Date) {
   return new Date(value).toLocaleDateString("en-GB", { timeZone: "Asia/Karachi" });
 }
@@ -144,7 +148,7 @@ export default async function EmployeeDetailsPage({
     sql<EmployeeAttendanceRow[]>`
       select
         id,
-        timezone('Asia/Karachi', check_in_time)::date::text as attendance_date,
+        timezone(${OFFICE_TIME_ZONE}, check_in_time)::date::text as attendance_date,
         to_char(check_in_time at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as check_in_at,
         status,
         accuracy::text,
@@ -403,7 +407,7 @@ export default async function EmployeeDetailsPage({
                           {row.status}
                         </span>
                       </td>
-                      <td className="py-3 pr-4 text-slate-700">{formatDateTime(row.check_in_at)}</td>
+                      <td className="py-3 pr-4 text-slate-700">{formatAttendanceDateTime(row.check_in_at)}</td>
                       <td className="py-3 pr-4 text-slate-700">{row.distance_from_office ? `${Number(row.distance_from_office).toFixed(1)} m` : "-"}</td>
                       <td className="py-3 text-slate-700">{row.accuracy ? `${Number(row.accuracy).toFixed(1)} m` : "-"}</td>
                     </tr>
