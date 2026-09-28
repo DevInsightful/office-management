@@ -25,15 +25,38 @@ function getSqlClient() {
   return global.__officeSql;
 }
 
+function isTransientDnsError(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "EAI_AGAIN";
+}
+
+function waitForRetry(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function runSqlQuery(strings: TemplateStringsArray, values: unknown[]) {
+  // EAI_AGAIN means DNS did not answer in time, before a SQL statement can reach Neon.
+  // Retrying only this error is safe for reads and writes alike.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await (getSqlClient() as unknown as (
+        template: TemplateStringsArray,
+        ...parameters: unknown[]
+      ) => Promise<unknown>)(strings, ...values);
+    } catch (error) {
+      if (!isTransientDnsError(error) || attempt === 2) {
+        throw error;
+      }
+
+      await waitForRetry(150 * (attempt + 1));
+    }
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const sql: any = (
   strings: TemplateStringsArray,
   ...values: unknown[]
-) =>
-  (getSqlClient() as unknown as (
-    template: TemplateStringsArray,
-    ...parameters: unknown[]
-  ) => unknown)(strings, ...values);
+) => runSqlQuery(strings, values);
 
 export async function ensureDb() {
   await bootstrap();
@@ -137,6 +160,16 @@ async function bootstrap() {
   await sql`
     create index if not exists attendance_records_employee_check_in_idx
     on attendance_records (employee_id, check_in_time desc);
+  `;
+
+  await sql`
+    create table if not exists attendance_holidays (
+      id serial primary key,
+      title text not null,
+      holiday_date date not null unique,
+      created_by integer references users(id) on delete set null,
+      created_at timestamptz not null default now()
+    );
   `;
 
   await sql`

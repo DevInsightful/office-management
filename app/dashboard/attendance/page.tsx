@@ -1,9 +1,9 @@
-import { markAttendanceByAdminAction } from "@/app/actions";
+import { createAttendanceHolidayAction, markAttendanceByAdminAction } from "@/app/actions";
 import { AttendanceCheckIn } from "@/app/dashboard/attendance-check-in";
 import { AttendanceCalendarClient, AttendanceReportClient } from "@/app/dashboard/client-tables";
 import { PendingSubmitButton } from "@/app/pending-controls";
 import { Field, PageIntro, Panel, inputClass, primaryButton } from "@/app/ui";
-import { getKarachiTodayIsoDate } from "@/lib/attendance-policy";
+import { formatAttendanceDate, getKarachiTodayIsoDate } from "@/lib/attendance-policy";
 import { requireUser } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
 
@@ -37,14 +37,31 @@ export default async function AttendancePage() {
         description={
           user.role === "super_admin"
             ? "Review office attendance by calendar and report filters. Super admin is excluded from attendance marking."
-            : "Use this page to mark today’s attendance with GPS. Check-in until 3:15 PM PKT is present, later approved check-ins become half day, and final cutoffs mark the day absent."
+            : "Use this page to mark today’s attendance with GPS. Friday is present through 4:30 PM; other working days are present before 3:21 PM. Sunday is off by default."
         }
       />
 
       <section className="grid gap-4">
         {user.role !== "super_admin" ? (
-          <Panel title="Today Check-In" subtitle="Until 3:15 PM PKT check-in is present. After that it becomes half day until 4:00 PM PKT, or 4:15 PM PKT on Friday.">
+          <Panel title="Today Check-In" subtitle="Friday: present through 4:30 PM, half day through 5:00 PM. Other working days: present before 3:21 PM, half day through 4:00 PM.">
             <AttendanceCheckIn />
+          </Panel>
+        ) : null}
+
+        {user.role !== "employee" ? (
+          <Panel title="Holiday Management" subtitle="Mark a calendar date as a holiday. Employees are not required to check in on holidays.">
+            <form action={createAttendanceHolidayAction} className="grid gap-3 lg:grid-cols-[1fr_220px_auto]">
+              <Field label="Holiday / event title"><input name="title" required className={inputClass} placeholder="e.g. Independence Day" /></Field>
+              <Field label="Holiday date"><input name="holidayDate" type="date" required defaultValue={today} className={inputClass} /></Field>
+              <div className="self-end"><PendingSubmitButton idleLabel="Mark holiday" pendingLabel="Saving..." className={`${primaryButton} gap-3 lg:w-auto`} pendingClassName="cursor-not-allowed bg-slate-700 hover:bg-slate-700" /></div>
+            </form>
+            {data.attendanceHolidays.length > 0 ? (
+              <div className="mt-4 text-sm text-slate-600">
+                {data.attendanceHolidays.map((holiday) => (
+                  <p key={holiday.id}>{formatAttendanceDate(holiday.holidayDate)}: {holiday.title}</p>
+                ))}
+              </div>
+            ) : null}
           </Panel>
         ) : null}
 
@@ -79,6 +96,7 @@ export default async function AttendancePage() {
           today={today}
           employees={trackedEmployees}
           attendance={data.attendance}
+          holidays={data.attendanceHolidays}
           defaultEmployeeId={user.role === "super_admin" ? trackedEmployees.find((employee) => employee.role !== "super_admin")?.id ?? user.id : user.id}
           allowEmployeeSelect={user.role === "super_admin" || user.role === "admin"}
         />
@@ -87,6 +105,7 @@ export default async function AttendancePage() {
           today={today}
           employees={trackedEmployees}
           attendance={data.attendance}
+          holidays={data.attendanceHolidays}
           defaultEmployeeId={user.role === "super_admin" ? undefined : user.id}
           allowOfficeFilters={user.role === "super_admin" || user.role === "admin"}
         />

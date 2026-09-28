@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { getAttendanceDecision } from "@/lib/attendance-policy";
+import { getAttendanceDecision, getKarachiTodayIsoDate, getNonWorkingDayStatus } from "@/lib/attendance-policy";
+import { getAttendanceHoliday } from "@/lib/attendance-holidays";
 import { getAttendanceConfig } from "@/lib/config";
 import { calculateDistanceMeters } from "@/lib/haversine";
 import { distanceToPolygonMeters, isPointInsidePolygon } from "@/lib/geofence";
@@ -169,6 +170,18 @@ export async function checkInAttendance(
   }
 
   const now = new Date();
+  const todayInKarachi = getKarachiTodayIsoDate(now);
+  const holiday = await getAttendanceHoliday(todayInKarachi);
+  const nonWorkingStatus = getNonWorkingDayStatus(todayInKarachi, holiday ? [todayInKarachi] : []);
+
+  if (nonWorkingStatus) {
+    const message = nonWorkingStatus === "holiday"
+      ? `${holiday?.title ?? "Today"} is a holiday. Attendance is not required.`
+      : "Today is the weekly off day. Attendance is not required.";
+    await logAttempt({ ...payload, officeRadius: config.officeRadiusMeters, result: `blocked_${nonWorkingStatus}`, message });
+    return { success: false, message, status: 403 };
+  }
+
   const rateLimitCutoff = new Date(now.getTime() - config.rateLimitWindowMinutes * 60_000);
   const attendanceDay = getKarachiDayBounds(now);
 

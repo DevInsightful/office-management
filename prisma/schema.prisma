@@ -31,8 +31,20 @@ model User {
   profileDetailsUpdatedAt DateTime?      @map("profile_details_updated_at") @db.Timestamptz(6)
   attendanceRecords  Attendance[]
   attendanceAttempts AttendanceAttempt[]
+  createdAttendanceHolidays AttendanceHoliday[] @relation("AttendanceHolidayCreator")
 
   @@map("users")
+}
+
+model AttendanceHoliday {
+  id          Int      @id @default(autoincrement())
+  title       String
+  holidayDate DateTime @unique @map("holiday_date") @db.Date
+  createdBy   Int?     @map("created_by")
+  creator     User?    @relation("AttendanceHolidayCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("attendance_holidays")
 }
 
 model Attendance {

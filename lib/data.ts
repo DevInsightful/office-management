@@ -3,6 +3,7 @@ import { ensureDb, sql } from "@/lib/db";
 import { seedIfEmpty } from "@/lib/seed";
 import { CurrencyCode, currency } from "@/lib/currency";
 import { getCurrencySetting } from "@/lib/settings";
+import { getAttendanceHolidays } from "@/lib/attendance-holidays";
 
 export type DashboardData = {
   user: SessionUser;
@@ -60,6 +61,7 @@ export type DashboardData = {
   }[];
   taskLogs: TaskLogRow[];
   attendance: AttendanceRow[];
+  attendanceHolidays: { id: number; title: string; holidayDate: string }[];
   payroll: {
     id: number;
     full_name: string;
@@ -417,13 +419,14 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
           order by coalesce(sum(l.minutes_spent), 0) desc
         `;
 
-  const [employees, tasks, taskLogs, attendance, payroll, performance] = await Promise.all([
+  const [employees, tasks, taskLogs, attendance, payroll, performance, attendanceHolidays] = await Promise.all([
     employeesPromise,
     tasksPromise,
     taskLogsPromise,
     attendancePromise,
     payrollPromise,
     performancePromise,
+    getAttendanceHolidays(),
   ]);
 
   const financeTotals = financeSummary.reduce(
@@ -508,6 +511,7 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
       accuracy: row.accuracy ? Number(row.accuracy) : null,
       distanceFromOffice: row.distance_from_office ? Number(row.distance_from_office) : null,
     })),
+    attendanceHolidays,
     payroll: payroll.map((row: PayrollRow) => ({
       ...row,
       salary: Number(row.salary),

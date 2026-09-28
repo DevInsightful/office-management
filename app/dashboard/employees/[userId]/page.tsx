@@ -4,6 +4,7 @@ import { ActionLink, Badge, MetricCard, PageIntro, Panel, PriorityBadge, currenc
 import { requireAdmin } from "@/lib/auth";
 import { ensureDb, sql } from "@/lib/db";
 import { getCurrencySetting } from "@/lib/settings";
+import { formatAttendanceDate } from "@/lib/attendance-policy";
 
 type EmployeeProfileRow = {
   id: number;
@@ -396,7 +397,7 @@ export default async function EmployeeDetailsPage({
                 {attendanceRows.length > 0 ? (
                   attendanceRows.map((row: EmployeeAttendanceRow) => (
                     <tr key={row.id}>
-                      <td className="py-3 pr-4 text-slate-700">{row.attendance_date}</td>
+                      <td className="py-3 pr-4 text-slate-700">{formatAttendanceDate(row.attendance_date)}</td>
                       <td className="py-3 pr-4">
                         <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] ${getAttendanceBadgeClass(row.status)}`}>
                           {row.status}

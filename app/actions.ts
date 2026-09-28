@@ -11,7 +11,8 @@ import {
   requireUser,
   verifyPassword,
 } from "@/lib/auth";
-import { getAttendanceDecision, getKarachiTodayIsoDate } from "@/lib/attendance-policy";
+import { getAttendanceDecision, getKarachiTodayIsoDate, getNonWorkingDayStatus } from "@/lib/attendance-policy";
+import { getAttendanceHoliday } from "@/lib/attendance-holidays";
 import { ensureDb, sql } from "@/lib/db";
 import { seedIfEmpty } from "@/lib/seed";
 import { SUPPORTED_CURRENCIES } from "@/lib/currency";
@@ -395,6 +396,12 @@ export async function markAttendanceByAdminAction(formData: FormData) {
   const now = new Date();
   const todayInKarachi = getKarachiTodayIsoDate(now);
   const attendanceDecision = getAttendanceDecision(now);
+  const holiday = await getAttendanceHoliday(attendanceDate);
+  const nonWorkingStatus = getNonWorkingDayStatus(attendanceDate, holiday ? [attendanceDate] : []);
+
+  if (nonWorkingStatus) {
+    redirect(`/dashboard/attendance?error=${nonWorkingStatus}_attendance_not_required`);
+  }
 
   if (attendanceDate === todayInKarachi && !attendanceDecision.allowed) {
     redirect("/dashboard/attendance?error=attendance_cutoff_passed");
@@ -430,6 +437,30 @@ export async function markAttendanceByAdminAction(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/attendance");
   revalidatePath("/dashboard/performance");
+  redirect("/dashboard/attendance");
+}
+
+function isIsoCalendarDate(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+}
+
+export async function createAttendanceHolidayAction(formData: FormData) {
+  const actor = await requireAdmin();
+  const title = cleanText(formData.get("title"));
+  const holidayDate = cleanText(formData.get("holidayDate"));
+
+  if (!title || !isIsoCalendarDate(holidayDate)) {
+    redirect("/dashboard/attendance?error=invalid_holiday");
+  }
+
+  await sql`
+    insert into attendance_holidays (title, holiday_date, created_by)
+    values (${title}, ${holidayDate}::date, ${actor.id})
+    on conflict (holiday_date) do update set title = excluded.title, created_by = excluded.created_by
+  `;
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/attendance");
   redirect("/dashboard/attendance");
 }
 

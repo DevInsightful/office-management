@@ -25,6 +25,7 @@ import { Badge, Field, MetricCard, Panel, PriorityBadge, currency, inputClass, p
 import { findCsvColumnIndex } from "@/lib/csv";
 import { FACEBOOK_ID_STATUS_OPTIONS, validateFacebookIdRow } from "@/lib/facebook-id-validation";
 import { parseTabularFile } from "@/lib/spreadsheet";
+import { AttendanceDisplayStatus, formatAttendanceDate, getNonWorkingDayStatus } from "@/lib/attendance-policy";
 
 type SortDirection = "asc" | "desc";
 
@@ -881,7 +882,7 @@ type AttendanceReportEntry = {
   distanceFromOffice: number | null;
 };
 
-function getAttendanceStatusClasses(status: "present" | "half_day" | "absent") {
+function getAttendanceStatusClasses(status: AttendanceDisplayStatus) {
   if (status === "present") {
     return "bg-emerald-100 text-emerald-700";
   }
@@ -889,6 +890,9 @@ function getAttendanceStatusClasses(status: "present" | "half_day" | "absent") {
   if (status === "half_day") {
     return "bg-amber-100 text-amber-800";
   }
+
+  if (status === "holiday") return "bg-violet-100 text-violet-700";
+  if (status === "weekend") return "bg-slate-200 text-slate-700";
 
   return "bg-rose-100 text-rose-700";
 }
@@ -1014,12 +1018,14 @@ function listDays(from: string, to: string) {
 export function AttendanceReportClient({
   employees,
   attendance,
+  holidays,
   today,
   defaultEmployeeId,
   allowOfficeFilters = true,
 }: {
   employees: AttendanceReportEmployee[];
   attendance: AttendanceReportEntry[];
+  holidays: { id: number; title: string; holidayDate: string }[];
   today: string;
   defaultEmployeeId?: number;
   allowOfficeFilters?: boolean;
@@ -1101,7 +1107,8 @@ export function AttendanceReportClient({
 
       return days.map((day) => {
         const match = attendanceByEmployeeAndDate.get(`${employee.id}-${day}`);
-        const status: "present" | "half_day" | "absent" = match?.status ?? "absent";
+        const nonWorkingStatus = getNonWorkingDayStatus(day, holidays.map((holiday) => holiday.holidayDate));
+        const status: AttendanceDisplayStatus = nonWorkingStatus ?? match?.status ?? "absent";
 
         return {
           key: `${employee.id}-${day}`,
@@ -1129,7 +1136,7 @@ export function AttendanceReportClient({
 
         return compareString(left.full_name, right.full_name, direction);
       });
-  }, [activeRange.from, activeRange.to, attendance, direction, filteredEmployees, search, sort]);
+  }, [activeRange.from, activeRange.to, attendance, direction, filteredEmployees, holidays, search, sort]);
 
   const totals = useMemo(
     () =>
@@ -1140,7 +1147,7 @@ export function AttendanceReportClient({
             acc.present += 1;
           } else if (row.status === "half_day") {
             acc.halfDay += 1;
-          } else {
+          } else if (row.status === "absent") {
             acc.absent += 1;
           }
           return acc;
@@ -1254,7 +1261,7 @@ export function AttendanceReportClient({
 
       <Panel
         title="Attendance Report"
-        subtitle={`Showing ${activeRange.from} to ${activeRange.to}. Employees without a check-in are absent, and late approved check-ins show as half day.`}
+        subtitle={`Showing ${formatAttendanceDate(activeRange.from)} to ${formatAttendanceDate(activeRange.to)}. Holidays and Sundays are off days, not absences.`}
       >
         <div className="max-w-full overflow-x-auto">
           <table className="min-w-[900px] table-fixed text-sm">
@@ -1273,7 +1280,7 @@ export function AttendanceReportClient({
                 attendanceRows.map((row) => (
                   <tr key={row.key}>
                     <td className="py-3 pr-3 font-medium text-slate-900">{row.full_name}</td>
-                    <td className="py-3 pr-3 text-slate-600">{row.attendance_date}</td>
+                    <td className="py-3 pr-3 text-slate-600">{formatAttendanceDate(row.attendance_date)}</td>
                     <td className="py-3 pr-3">
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] ${
@@ -1312,12 +1319,14 @@ export function AttendanceReportClient({
 export function AttendanceCalendarClient({
   employees,
   attendance,
+  holidays,
   today,
   defaultEmployeeId,
   allowEmployeeSelect = true,
 }: {
   employees: AttendanceReportEmployee[];
   attendance: AttendanceReportEntry[];
+  holidays: { id: number; title: string; holidayDate: string }[];
   today: string;
   defaultEmployeeId: number;
   allowEmployeeSelect?: boolean;
@@ -1370,14 +1379,14 @@ export function AttendanceCalendarClient({
     const effectiveStart = effectiveEmployee.joinedOn > monthStart ? effectiveEmployee.joinedOn : monthStart;
     return listDays(effectiveStart, monthEnd).map((date) => ({
       date,
-      status: attendanceDates.get(date) ?? "absent",
+      status: getNonWorkingDayStatus(date, holidays.map((holiday) => holiday.holidayDate)) ?? attendanceDates.get(date) ?? "absent",
       isToday: date === today,
     }));
-  }, [attendanceDates, effectiveEmployee, monthEnd, monthStart, today]);
+  }, [attendanceDates, effectiveEmployee, holidays, monthEnd, monthStart, today]);
 
   return (
     <section className="grid gap-4">
-      <Panel title="Attendance Calendar" subtitle="Current month calendar for one staff member. Present is green, half day is amber, and missing days stay absent.">
+      <Panel title="Attendance Calendar" subtitle="Current month calendar for one staff member. Holidays and Sundays are shown as off days.">
         <div className={`grid gap-3 ${allowEmployeeSelect ? "lg:grid-cols-[260px_1fr]" : "lg:grid-cols-1"}`}>
           {allowEmployeeSelect ? (
             <Field label="Employee">
@@ -1399,10 +1408,14 @@ export function AttendanceCalendarClient({
                     ? "border-emerald-200 bg-emerald-50"
                     : day.status === "half_day"
                       ? "border-amber-200 bg-amber-50"
-                    : "border-rose-200 bg-rose-50"
+                      : day.status === "holiday"
+                        ? "border-violet-200 bg-violet-50"
+                        : day.status === "weekend"
+                          ? "border-slate-300 bg-slate-100"
+                      : "border-rose-200 bg-rose-50"
                 } ${day.isToday ? "ring-2 ring-amber-300" : ""}`}
               >
-                <p className="font-semibold text-slate-900">{day.date.slice(8, 10)}</p>
+                <p className="font-semibold text-slate-900">{formatAttendanceDate(day.date)}</p>
                 <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-600">{day.status}</p>
               </div>
             ))}
