@@ -2,9 +2,11 @@ export type QuickDatePreset =
   | "today"
   | "this-week"
   | "this-month"
+  | "last-month"
   | "this-quarter"
   | "this-year"
   | "ytd"
+  | "all"
   | "custom";
 
 export type QuickDateRange = { from: string; to: string };
@@ -30,7 +32,7 @@ function monthEnd(year: number, monthIndex: number) {
 }
 
 export function getQuickDateRange(
-  preset: Exclude<QuickDatePreset, "custom">,
+  preset: Exclude<QuickDatePreset, "custom" | "all">,
   now = new Date(),
   options: QuickDateOptions = {},
 ): QuickDateRange {
@@ -52,6 +54,10 @@ export function getQuickDateRange(
     case "this-month":
       from = monthStart(year, month);
       to = monthEnd(year, month);
+      break;
+    case "last-month":
+      from = monthStart(year, month - 1);
+      to = monthEnd(year, month - 1);
       break;
     case "this-quarter": {
       const fiscalStartMonth = (options.fiscalYearStartMonth ?? 1) - 1;
@@ -86,13 +92,18 @@ export function isValidDateRange(from: string, to: string) {
   return isDate(from) && isDate(to) && from <= to;
 }
 
+export function isValidDate(value: string) {
+  return isValidDateRange(value, value);
+}
+
 export function formatQuickDateRange({ from, to }: QuickDateRange, locale?: string) {
-  if (!from || !to) return "Choose a start and end date";
   const format = (value: string) => {
     const [year, month, day] = value.split("-").map(Number);
     return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", year: "numeric" }).format(
       new Date(year, month - 1, day),
     );
   };
+  if (!from && to) return `All dates through ${format(to)}`;
+  if (!from || !to) return "Choose a start and end date";
   return `${format(from)} – ${format(to)}`;
 }

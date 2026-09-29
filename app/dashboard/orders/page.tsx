@@ -6,27 +6,32 @@ import { PendingSubmitButton } from "@/app/pending-controls";
 import { ActionLink, MetricCard, ModalFrame, PageIntro, currency } from "@/app/ui";
 import { requireUser } from "@/lib/auth";
 import { getOrdersData } from "@/lib/orders";
-import { QuickDateFilter } from "@/app/dashboard/quick-date-filter";
-import { getQuickDateRange, isValidDateRange, type QuickDatePreset } from "@/lib/quick-date-range";
+import { OrdersFiltersClient } from "@/app/dashboard/orders-filters-client";
+import { getQuickDateRange, isValidDate, isValidDateRange, type QuickDatePreset } from "@/lib/quick-date-range";
 
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ modal?: string; order?: string; period?: string; from?: string; to?: string }>;
+  searchParams?: Promise<{ modal?: string; order?: string; period?: string; from?: string; to?: string; dateField?: string }>;
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const params = searchParams ? await searchParams : undefined;
-  const presets: QuickDatePreset[] = ["today", "this-week", "this-month", "this-quarter", "this-year", "ytd", "custom"];
+  const presets: QuickDatePreset[] = ["today", "this-week", "this-month", "last-month", "this-quarter", "this-year", "ytd", "all", "custom"];
   const requestedPreset = presets.includes(params?.period as QuickDatePreset) ? params?.period as QuickDatePreset : "this-month";
   const urlRange = { from: params?.from ?? "", to: params?.to ?? "" };
   const requestedRange = isValidDateRange(urlRange.from, urlRange.to)
     ? urlRange
     : requestedPreset === "custom"
       ? urlRange
+      : requestedPreset === "all"
+        ? { from: "", to: params?.to && isValidDate(params.to) ? params.to : getQuickDateRange("today").to }
       : getQuickDateRange(requestedPreset);
-  const dateRange = isValidDateRange(requestedRange.from, requestedRange.to) ? requestedRange : undefined;
+  const dateRange = requestedPreset === "all"
+    ? isValidDate(requestedRange.to) ? requestedRange : undefined
+    : isValidDateRange(requestedRange.from, requestedRange.to) ? requestedRange : undefined;
+  const dateField = params?.dateField === "delivery" ? "delivery" : "booking";
   const user = await requireUser();
-  const data = await getOrdersData(user, dateRange);
+  const data = await getOrdersData(user, dateRange, dateField);
   const canManageStatus = user.role !== "employee";
   const modal = params?.modal;
   const selectedOrderId = Number(params?.order ?? 0);
@@ -45,20 +50,23 @@ export default async function OrdersPage({
         action={<ActionLink href="/dashboard/orders?modal=create-order" label="Create Order" />}
       />
 
-      <QuickDateFilter
-        initialPreset={requestedPreset}
-        initialFrom={params?.from}
-        initialTo={params?.to}
-      />
+      <OrdersFiltersClient
+          initialPreset={requestedPreset}
+          initialFrom={params?.from}
+          initialTo={params?.to}
+          dateField={dateField}
+      >
+          <section className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <MetricCard label="Total Orders" value={String(data.metrics.totalOrders)} tone="sky" />
+            <MetricCard label="Completed Orders" value={String(data.metrics.completedOrders)} tone="emerald" />
+            <MetricCard label="Approved" value={String(data.metrics.approvedOrders)} tone="amber" />
+            <MetricCard label="Pending" value={String(data.metrics.pendingOrders)} tone="violet" />
+          </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Total Orders" value={String(data.metrics.totalOrders)} tone="sky" />
-        <MetricCard label="Completed Orders" value={String(data.metrics.completedOrders)} tone="emerald" />
-        <MetricCard label="Approved" value={String(data.metrics.approvedOrders)} tone="amber" />
-        <MetricCard label="Pending" value={String(data.metrics.pendingOrders)} tone="violet" />
-      </section>
-
-      <OrdersTableClient orders={data.orders} canManageStatus={canManageStatus} currencyCode={data.currency} />
+          <div className="mt-4">
+            <OrdersTableClient orders={data.orders} canManageStatus={canManageStatus} currencyCode={data.currency} />
+          </div>
+      </OrdersFiltersClient>
 
       {modal === "create-order" && (
         <ModalFrame

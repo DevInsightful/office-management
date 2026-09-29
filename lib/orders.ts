@@ -4,7 +4,7 @@ import { seedIfEmpty } from "@/lib/seed";
 import { CurrencyCode } from "@/lib/currency";
 import { getCurrencySetting } from "@/lib/settings";
 import { buildPublicStorageUrl } from "@/lib/supabase";
-import { isValidDateRange, type QuickDateRange } from "@/lib/quick-date-range";
+import { isValidDate, isValidDateRange, type QuickDateRange } from "@/lib/quick-date-range";
 
 export type OrderStatus =
   | "pending"
@@ -12,6 +12,8 @@ export type OrderStatus =
   | "rejected"
   | "cancelled"
   | "delivered";
+
+export type OrdersDateField = "booking" | "delivery";
 
 type OrderRow = {
   id: number;
@@ -80,14 +82,20 @@ export type OrdersData = {
 
 type OrderItem = OrdersData["orders"][number];
 
-export async function getOrdersData(user: SessionUser, dateRange?: QuickDateRange): Promise<OrdersData> {
+export async function getOrdersData(
+  user: SessionUser,
+  dateRange?: QuickDateRange,
+  dateField: OrdersDateField = "booking",
+): Promise<OrdersData> {
   await ensureDb();
   await seedIfEmpty();
 
   const currencyCode = await getCurrencySetting();
 
-  const validRange = dateRange && isValidDateRange(dateRange.from, dateRange.to) ? dateRange : undefined;
-  const fromDate = validRange?.from ?? null;
+  const validRange = dateRange && (dateRange.from ? isValidDateRange(dateRange.from, dateRange.to) : isValidDate(dateRange.to))
+    ? dateRange
+    : undefined;
+  const fromDate = validRange?.from || null;
   const toDate = validRange?.to ?? null;
   const rows = await sql<OrderRow[]>`
           select
@@ -119,8 +127,8 @@ export async function getOrdersData(user: SessionUser, dateRange?: QuickDateRang
           from orders o
           join users u on u.id = o.csr_user_id
           where (${user.role !== "employee"} or o.csr_user_id = ${user.id})
-            and (${fromDate}::date is null or o.booking_date >= ${fromDate}::date)
-            and (${toDate}::date is null or o.booking_date <= ${toDate}::date)
+            and (${fromDate}::date is null or (case when ${dateField === "delivery"} then o.delivery_date else o.booking_date end) >= ${fromDate}::date)
+            and (${toDate}::date is null or (case when ${dateField === "delivery"} then o.delivery_date else o.booking_date end) <= ${toDate}::date)
           order by o.created_at desc
         `;
 
