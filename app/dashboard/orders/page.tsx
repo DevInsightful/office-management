@@ -6,17 +6,28 @@ import { PendingSubmitButton } from "@/app/pending-controls";
 import { ActionLink, MetricCard, ModalFrame, PageIntro, currency } from "@/app/ui";
 import { requireUser } from "@/lib/auth";
 import { getOrdersData } from "@/lib/orders";
+import { QuickDateFilter } from "@/app/dashboard/quick-date-filter";
+import { getQuickDateRange, isValidDateRange, type QuickDatePreset } from "@/lib/quick-date-range";
 
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ modal?: string; order?: string }>;
+  searchParams?: Promise<{ modal?: string; order?: string; period?: string; from?: string; to?: string }>;
 }) {
   const today = new Date().toISOString().slice(0, 10);
-  const user = await requireUser();
-  const data = await getOrdersData(user);
-  const canManageStatus = user.role !== "employee";
   const params = searchParams ? await searchParams : undefined;
+  const presets: QuickDatePreset[] = ["today", "this-week", "this-month", "this-quarter", "this-year", "ytd", "custom"];
+  const requestedPreset = presets.includes(params?.period as QuickDatePreset) ? params?.period as QuickDatePreset : "this-month";
+  const urlRange = { from: params?.from ?? "", to: params?.to ?? "" };
+  const requestedRange = isValidDateRange(urlRange.from, urlRange.to)
+    ? urlRange
+    : requestedPreset === "custom"
+      ? urlRange
+      : getQuickDateRange(requestedPreset);
+  const dateRange = isValidDateRange(requestedRange.from, requestedRange.to) ? requestedRange : undefined;
+  const user = await requireUser();
+  const data = await getOrdersData(user, dateRange);
+  const canManageStatus = user.role !== "employee";
   const modal = params?.modal;
   const selectedOrderId = Number(params?.order ?? 0);
   const selectedOrder = data.orders.find((order) => order.id === selectedOrderId) ?? null;
@@ -32,6 +43,12 @@ export default async function OrdersPage({
             : "Create orders, review all employee orders, and update statuses like approved, rejected, cancelled, or delivered."
         }
         action={<ActionLink href="/dashboard/orders?modal=create-order" label="Create Order" />}
+      />
+
+      <QuickDateFilter
+        initialPreset={requestedPreset}
+        initialFrom={params?.from}
+        initialTo={params?.to}
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

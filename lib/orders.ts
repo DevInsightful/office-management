@@ -4,6 +4,7 @@ import { seedIfEmpty } from "@/lib/seed";
 import { CurrencyCode } from "@/lib/currency";
 import { getCurrencySetting } from "@/lib/settings";
 import { buildPublicStorageUrl } from "@/lib/supabase";
+import { isValidDateRange, type QuickDateRange } from "@/lib/quick-date-range";
 
 export type OrderStatus =
   | "pending"
@@ -79,15 +80,16 @@ export type OrdersData = {
 
 type OrderItem = OrdersData["orders"][number];
 
-export async function getOrdersData(user: SessionUser): Promise<OrdersData> {
+export async function getOrdersData(user: SessionUser, dateRange?: QuickDateRange): Promise<OrdersData> {
   await ensureDb();
   await seedIfEmpty();
 
   const currencyCode = await getCurrencySetting();
 
-  const rows =
-    user.role === "employee"
-      ? await sql<OrderRow[]>`
+  const validRange = dateRange && isValidDateRange(dateRange.from, dateRange.to) ? dateRange : undefined;
+  const fromDate = validRange?.from ?? null;
+  const toDate = validRange?.to ?? null;
+  const rows = await sql<OrderRow[]>`
           select
             o.id,
             o.note,
@@ -116,38 +118,9 @@ export async function getOrdersData(user: SessionUser): Promise<OrdersData> {
             u.role as csr_role
           from orders o
           join users u on u.id = o.csr_user_id
-          where o.csr_user_id = ${user.id}
-          order by o.created_at desc
-        `
-      : await sql<OrderRow[]>`
-          select
-            o.id,
-            o.note,
-            o.id_name,
-            o.booking_date::text,
-            o.delivery_date::text,
-            o.customer_name,
-            o.address,
-            o.phone_number,
-            o.order_details,
-            o.color,
-            o.price::text,
-            o.free_delivery,
-            o.delivery_price::text,
-            o.free_parking,
-            o.total::text,
-            o.payment_method,
-            o.description,
-            o.image_url,
-            o.commission_amount::text,
-            o.status,
-            o.created_at::text,
-            o.updated_at::text,
-            o.csr_user_id,
-            u.full_name as csr_name,
-            u.role as csr_role
-          from orders o
-          join users u on u.id = o.csr_user_id
+          where (${user.role !== "employee"} or o.csr_user_id = ${user.id})
+            and (${fromDate}::date is null or o.booking_date >= ${fromDate}::date)
+            and (${toDate}::date is null or o.booking_date <= ${toDate}::date)
           order by o.created_at desc
         `;
 

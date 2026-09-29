@@ -12,61 +12,47 @@ export function SidebarShell({
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const showExpanded = expanded || mobileOpen;
 
   return (
-    <div className="mx-auto flex w-full max-w-none flex-col gap-4 xl:grid xl:grid-cols-[76px_minmax(0,1fr)] xl:gap-6">
-      <div className="flex items-center justify-between rounded-[1.5rem] border border-white/70 bg-white/80 px-4 py-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur xl:hidden">
+    <div className="min-h-screen w-full">
+      <div className="mb-4 flex items-center justify-between rounded-2xl border border-white/70 bg-white/85 px-4 py-3 shadow-sm backdrop-blur xl:hidden">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-amber-700">
-            Navigation
-          </p>
-          <p className="mt-1 text-sm text-slate-600">Open the sidebar to switch pages.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-700">Navigation</p>
+          <p className="mt-1 text-sm text-slate-600">Go to another section</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setMobileOpen((value) => !value)}
-          className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-        >
-          {mobileOpen ? "Close Menu" : "Open Menu"}
+        <button type="button" aria-expanded={mobileOpen} onClick={() => setMobileOpen((value) => !value)} className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+          {mobileOpen ? "Close menu" : "Open menu"}
         </button>
       </div>
 
-      {mobileOpen && (
-        <button
-          type="button"
-          aria-label="Close navigation overlay"
-          onClick={() => setMobileOpen(false)}
-          className="fixed inset-0 z-30 bg-slate-950/35 xl:hidden"
-        />
-      )}
+      {mobileOpen && <button type="button" aria-label="Close navigation" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-40 bg-slate-950/40 xl:hidden" />}
 
-      <aside
-        className={`${
-          mobileOpen ? "translate-x-0" : "-translate-x-[115%]"
-        } fixed left-4 top-4 z-40 w-[min(320px,calc(100vw-2rem))] transition-transform duration-200 xl:static xl:w-auto xl:translate-x-0 xl:self-start`}
-      >
-        <div className="hidden xl:fixed xl:left-0 xl:top-0 xl:z-[60] xl:flex xl:w-[76px] xl:justify-center">
-          <button
-            type="button"
-            aria-label={expanded ? "Collapse navigation" : "Expand navigation"}
-            title={expanded ? "Collapse navigation" : "Expand navigation"}
-            onClick={() => setExpanded((value) => !value)}
-            className="grid size-12 place-items-center rounded-2xl border border-white/70 bg-white/85 text-xl font-semibold text-slate-900 shadow-[0_12px_30px_rgba(15,23,42,0.08)] backdrop-blur transition hover:bg-amber-50"
-          >
-            {expanded ? "‹" : "☰"}
-          </button>
-        </div>
-        <div
-          onClick={() => setMobileOpen(false)}
-          className={showExpanded ? "xl:fixed xl:left-0 xl:top-0 xl:z-50 xl:w-[260px]" : "xl:fixed xl:left-0 xl:top-[4.5rem] xl:z-40 xl:w-[76px]"}
-        >
-          {showExpanded ? sidebar : compactSidebar}
+      <aside className={`${mobileOpen ? "translate-x-0" : "-translate-x-full xl:translate-x-0"} fixed inset-y-0 left-0 z-50 w-[min(320px,85vw)] overflow-hidden border-r border-slate-200/80 bg-white/95 shadow-2xl backdrop-blur transition-[width,transform] duration-200 xl:w-[var(--sidebar-width)] xl:shadow-lg ${expanded ? "[--sidebar-width:272px]" : "[--sidebar-width:80px]"}`}>
+        <div className="flex h-full min-h-0 flex-col">
+          <div className={`hidden shrink-0 border-b border-slate-200/80 p-3 xl:flex ${expanded ? "justify-end" : "justify-center"}`}>
+            <button type="button" aria-label={expanded ? "Collapse navigation" : "Expand navigation"} title={expanded ? "Collapse navigation" : "Expand navigation"} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)} className="grid size-10 place-items-center rounded-xl text-slate-600 transition hover:bg-amber-50 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-amber-500">
+              {expanded ? <ChevronLeft /> : <MenuIcon />}
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 [scrollbar-gutter:stable]" onClick={(event) => { if ((event.target as HTMLElement).closest("a")) setMobileOpen(false); }}>
+            {showExpanded ? sidebar : compactSidebar}
+          </div>
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-col gap-6 xl:pl-0">{children}</div>
+      <main className={`min-w-0 transition-[margin] duration-200 xl:ml-[var(--sidebar-width)] ${expanded ? "[--sidebar-width:272px]" : "[--sidebar-width:80px]"}`}>
+        {children}
+      </main>
     </div>
   );
+}
+
+function ChevronLeft() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="m14.5 5-7 7 7 7" /></svg>;
+}
+
+function MenuIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16" /></svg>;
 }
