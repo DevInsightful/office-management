@@ -20,13 +20,12 @@ export function getOfficeTodayIsoDate(date: Date) { return getOfficeDateParts(da
 export function getAttendanceDecision(date: Date) {
   const office = getOfficeDateParts(date);
   const totalMinutes = office.hour * 60 + office.minute;
-  const isFriday = office.weekday === "Fri";
-  const presentLimitMinutes = isFriday ? 16 * 60 + 30 : 15 * 60 + 20;
-  const halfDayLimitMinutes = isFriday ? 17 * 60 : 16 * 60;
+  const presentLimitMinutes = 16 * 60 + 30;
+  const halfDayLimitMinutes = 16 * 60 + 59;
 
   if (totalMinutes <= presentLimitMinutes) return { allowed: true, attendanceStatus: "present" as AttendanceStatus, message: "Attendance marked successfully." };
   if (totalMinutes <= halfDayLimitMinutes) return { allowed: true, attendanceStatus: "half_day" as AttendanceStatus, message: "Attendance marked as half day due to late check-in." };
-  return { allowed: false, cutoffMinutes: halfDayLimitMinutes, message: `Attendance cannot be marked after ${isFriday ? "5:00 PM on Friday" : "4:00 PM on working days"}. You are marked absent for today.` };
+  return { allowed: false, cutoffMinutes: halfDayLimitMinutes, message: "Attendance cannot be marked after 4:59 PM. You are marked absent for today." };
 }
 
 export function getNonWorkingDayStatus(isoDate: string, holidayDates: Iterable<string>): "weekend" | "holiday" | null {

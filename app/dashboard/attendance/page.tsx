@@ -37,13 +37,13 @@ export default async function AttendancePage() {
         description={
           user.role === "super_admin"
             ? "Review office attendance by calendar and report filters. Super admin is excluded from attendance marking."
-            : "Use this page to mark today’s attendance with GPS. Friday is present through 4:30 PM; other working days are present before 3:21 PM. Sunday is off by default."
+            : "Use this page to mark today’s attendance with GPS. Check in through 4:30 PM to be present, from 4:31 to 4:59 PM for a half day, or be marked absent after 4:59 PM. Sunday is off by default."
         }
       />
 
       <section className="grid gap-4">
         {user.role !== "super_admin" ? (
-          <Panel title="Today Check-In" subtitle="Friday: present through 4:30 PM, half day through 5:00 PM. Other working days: present before 3:21 PM, half day through 4:00 PM.">
+          <Panel title="Today Check-In" subtitle="All working days: present through 4:30 PM, half day from 4:31 through 4:59 PM. Check-ins after 4:59 PM are marked absent.">
             <AttendanceCheckIn />
           </Panel>
         ) : null}
