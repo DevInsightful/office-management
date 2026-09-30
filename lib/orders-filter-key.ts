@@ -6,10 +6,12 @@ export type OrdersFilterKeyParts = {
 };
 
 export function getOrdersFilterKey(parts: OrdersFilterKeyParts) {
+  const period = parts.period || "this-month";
+  const isCustom = period === "custom";
   return [
-    parts.period || "this-month",
-    parts.from || "",
-    parts.to || "",
+    period,
+    isCustom ? parts.from || "" : "",
+    isCustom ? parts.to || "" : "",
     parts.dateField === "delivery" ? "delivery" : "booking",
   ].join("|");
 }

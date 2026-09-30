@@ -20,12 +20,10 @@ export default async function OrdersPage({
   const presets: QuickDatePreset[] = ["today", "this-week", "this-month", "last-month", "this-quarter", "this-year", "ytd", "all", "custom"];
   const requestedPreset = presets.includes(params?.period as QuickDatePreset) ? params?.period as QuickDatePreset : "this-month";
   const urlRange = { from: params?.from ?? "", to: params?.to ?? "" };
-  const requestedRange = isValidDateRange(urlRange.from, urlRange.to)
+  const requestedRange = requestedPreset === "custom"
     ? urlRange
-    : requestedPreset === "custom"
-      ? urlRange
-      : requestedPreset === "all"
-        ? { from: "", to: params?.to && isValidDate(params.to) ? params.to : getQuickDateRange("today").to }
+    : requestedPreset === "all"
+      ? { from: "", to: getQuickDateRange("today").to }
       : getQuickDateRange(requestedPreset);
   const dateRange = requestedPreset === "all"
     ? isValidDate(requestedRange.to) ? requestedRange : undefined
@@ -57,9 +55,9 @@ export default async function OrdersPage({
           initialTo={params?.to}
           dateField={dateField}
           activeKey={getOrdersFilterKey({
-            period: params?.period ?? requestedPreset,
-            from: params?.from,
-            to: params?.to,
+            period: requestedPreset,
+            from: requestedPreset === "custom" ? params?.from : undefined,
+            to: requestedPreset === "custom" ? params?.to : undefined,
             dateField,
           })}
       >

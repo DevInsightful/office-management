@@ -63,10 +63,15 @@ export function QuickDateFilter({
     const timer = window.setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
       params.set("period", preset);
-      if (computed.from) params.set("from", computed.from);
-      else params.delete("from");
-      if (computed.to) params.set("to", computed.to);
-      else params.delete("to");
+      if (preset === "custom") {
+        if (computed.from) params.set("from", computed.from);
+        else params.delete("from");
+        if (computed.to) params.set("to", computed.to);
+        else params.delete("to");
+      } else {
+        params.delete("from");
+        params.delete("to");
+      }
       const query = params.toString();
       navigate(query ? `${window.location.pathname}?${query}` : window.location.pathname);
     }, 150);
@@ -78,8 +83,9 @@ export function QuickDateFilter({
     setPreset(next);
     setDirty(true);
     if (next === "custom") {
-      setFrom(initialFrom);
-      setTo(initialTo);
+      const hasInitialCustomRange = initialPreset === "custom";
+      setFrom(hasInitialCustomRange ? initialFrom : "");
+      setTo(hasInitialCustomRange ? initialTo : "");
     }
   }
 

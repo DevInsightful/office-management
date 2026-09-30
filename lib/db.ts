@@ -2,6 +2,7 @@ import postgres from "postgres";
 
 declare global {
   var __officeSql: ReturnType<typeof postgres> | undefined;
+  var __officeBootstrap: Promise<void> | undefined;
 }
 
 function getConnectionString() {
@@ -59,7 +60,14 @@ export const sql: any = (
 ) => runSqlQuery(strings, values);
 
 export async function ensureDb() {
-  await bootstrap();
+  if (!global.__officeBootstrap) {
+    global.__officeBootstrap = bootstrap().catch((error: unknown) => {
+      global.__officeBootstrap = undefined;
+      throw error;
+    });
+  }
+
+  await global.__officeBootstrap;
 }
 
 async function bootstrap() {
