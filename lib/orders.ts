@@ -50,6 +50,8 @@ export type OrdersData = {
     completedOrders: number;
     approvedOrders: number;
     pendingOrders: number;
+    totalOrderValue: number;
+    commissionEarned: number;
   };
   orders: {
     id: number;
@@ -167,6 +169,8 @@ export async function getOrdersData(
       completedOrders: orders.filter((order: OrderItem) => order.status === "delivered").length,
       approvedOrders: orders.filter((order: OrderItem) => order.status === "approved").length,
       pendingOrders: orders.filter((order: OrderItem) => order.status === "pending").length,
+      totalOrderValue: orders.reduce((sum: number, order: OrderItem) => sum + order.total, 0),
+      commissionEarned: orders.reduce((sum: number, order: OrderItem) => sum + order.commissionAmount, 0),
     },
     orders,
   };

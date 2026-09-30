@@ -63,6 +63,11 @@ export default async function OrdersPage({
             <MetricCard label="Pending" value={String(data.metrics.pendingOrders)} tone="violet" />
           </section>
 
+          <section aria-label="Order financial insights" className="mt-4 grid gap-4 md:grid-cols-2">
+            <MetricCard label="Total Order Value" value={currency(data.metrics.totalOrderValue, data.currency)} tone="sky" />
+            <MetricCard label="Commission Earned" value={currency(data.metrics.commissionEarned, data.currency)} tone="emerald" />
+          </section>
+
           <div className="mt-4">
             <OrdersTableClient orders={data.orders} canManageStatus={canManageStatus} currencyCode={data.currency} />
           </div>
