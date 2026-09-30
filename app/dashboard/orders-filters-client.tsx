@@ -12,16 +12,18 @@ export function OrdersFiltersClient({
   initialFrom,
   initialTo,
   dateField,
+  activeKey,
   children,
 }: {
   initialPreset: QuickDatePreset;
   initialFrom?: string;
   initialTo?: string;
   dateField: OrdersDateField;
+  activeKey: string;
   children: ReactNode;
 }) {
   return (
-    <OrdersFilterNavigation>
+    <OrdersFilterNavigation activeKey={activeKey}>
       <QuickDateFilter
         initialPreset={initialPreset}
         initialFrom={initialFrom}

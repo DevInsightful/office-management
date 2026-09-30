@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/auth";
 import { getOrdersData } from "@/lib/orders";
 import { OrdersFiltersClient } from "@/app/dashboard/orders-filters-client";
 import { getQuickDateRange, isValidDate, isValidDateRange, type QuickDatePreset } from "@/lib/quick-date-range";
+import { getOrdersFilterKey } from "@/lib/orders-filter-key";
 
 export default async function OrdersPage({
   searchParams,
@@ -55,6 +56,12 @@ export default async function OrdersPage({
           initialFrom={params?.from}
           initialTo={params?.to}
           dateField={dateField}
+          activeKey={getOrdersFilterKey({
+            period: params?.period ?? requestedPreset,
+            from: params?.from,
+            to: params?.to,
+            dateField,
+          })}
       >
           <section className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="Total Orders" value={String(data.metrics.totalOrders)} tone="sky" />
