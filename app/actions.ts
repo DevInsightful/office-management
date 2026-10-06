@@ -788,6 +788,7 @@ export async function createOrderAction(formData: FormData) {
   const deliveryDate = cleanDate(formData.get("deliveryDate"));
   const customerName = cleanText(formData.get("customerName"));
   const address = cleanText(formData.get("address"));
+  const postcode = cleanText(formData.get("postcode"));
   const phoneNumber = cleanText(formData.get("phoneNumber"));
   const orderDetails = cleanText(formData.get("orderDetails"));
   const color = cleanText(formData.get("color"));
@@ -847,6 +848,7 @@ export async function createOrderAction(formData: FormData) {
       delivery_date,
       customer_name,
       address,
+      postcode,
       phone_number,
       order_details,
       color,
@@ -867,6 +869,7 @@ export async function createOrderAction(formData: FormData) {
       ${deliveryDate},
       ${customerName},
       ${address},
+      ${postcode},
       ${phoneNumber},
       ${orderDetails},
       ${color},
@@ -951,6 +954,7 @@ export async function updateOrderAction(formData: FormData) {
   const deliveryDate = cleanDate(formData.get("deliveryDate"));
   const customerName = cleanText(formData.get("customerName"));
   const address = cleanText(formData.get("address"));
+  const postcode = cleanText(formData.get("postcode"));
   const phoneNumber = cleanText(formData.get("phoneNumber"));
   const orderDetails = cleanText(formData.get("orderDetails"));
   const color = cleanText(formData.get("color"));
@@ -1006,6 +1010,7 @@ export async function updateOrderAction(formData: FormData) {
       delivery_date = ${deliveryDate},
       customer_name = ${customerName},
       address = ${address},
+      postcode = ${postcode},
       phone_number = ${phoneNumber},
       order_details = ${orderDetails},
       color = ${color},

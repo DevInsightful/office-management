@@ -3,7 +3,10 @@ import postgres from "postgres";
 declare global {
   var __officeSql: ReturnType<typeof postgres> | undefined;
   var __officeBootstrap: Promise<void> | undefined;
+  var __officeBootstrapVersion: number | undefined;
 }
+
+const DB_SCHEMA_VERSION = 3;
 
 function getConnectionString() {
   const connectionString = process.env.DATABASE_URL;
@@ -60,9 +63,11 @@ export const sql: any = (
 ) => runSqlQuery(strings, values);
 
 export async function ensureDb() {
-  if (!global.__officeBootstrap) {
+  if (!global.__officeBootstrap || global.__officeBootstrapVersion !== DB_SCHEMA_VERSION) {
+    global.__officeBootstrapVersion = DB_SCHEMA_VERSION;
     global.__officeBootstrap = bootstrap().catch((error: unknown) => {
       global.__officeBootstrap = undefined;
+      global.__officeBootstrapVersion = undefined;
       throw error;
     });
   }
@@ -285,6 +290,7 @@ async function bootstrap() {
       delivery_date date not null,
       customer_name text not null,
       address text not null,
+      postcode text not null default '',
       phone_number text not null,
       order_details text not null,
       color text not null,
@@ -301,6 +307,11 @@ async function bootstrap() {
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
     );
+  `;
+
+  await sql`
+    alter table orders
+    add column if not exists postcode text not null default '';
   `;
 
   await sql`

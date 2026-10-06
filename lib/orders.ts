@@ -23,6 +23,7 @@ type OrderRow = {
   delivery_date: string;
   customer_name: string;
   address: string;
+  postcode: string;
   phone_number: string;
   order_details: string;
   color: string;
@@ -61,6 +62,7 @@ export type OrdersData = {
     deliveryDate: string;
     customerName: string;
     address: string;
+    postcode: string;
     phoneNumber: string;
     orderDetails: string;
     color: string;
@@ -108,6 +110,7 @@ export async function getOrdersData(
             o.delivery_date::text,
             o.customer_name,
             o.address,
+            o.postcode,
             o.phone_number,
             o.order_details,
             o.color,
@@ -142,6 +145,7 @@ export async function getOrdersData(
     deliveryDate: row.delivery_date,
     customerName: row.customer_name,
     address: row.address,
+    postcode: row.postcode,
     phoneNumber: row.phone_number,
     orderDetails: row.order_details,
     color: row.color,

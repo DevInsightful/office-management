@@ -1,3 +1,5 @@
+import { formatDateDDMMYY } from "@/lib/date-format";
+
 export type QuickDatePreset =
   | "today"
   | "this-week"
@@ -96,14 +98,8 @@ export function isValidDate(value: string) {
   return isValidDateRange(value, value);
 }
 
-export function formatQuickDateRange({ from, to }: QuickDateRange, locale?: string) {
-  const format = (value: string) => {
-    const [year, month, day] = value.split("-").map(Number);
-    return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", year: "numeric" }).format(
-      new Date(year, month - 1, day),
-    );
-  };
-  if (!from && to) return `All dates through ${format(to)}`;
+export function formatQuickDateRange({ from, to }: QuickDateRange) {
+  if (!from && to) return `All dates through ${formatDateDDMMYY(to)}`;
   if (!from || !to) return "Choose a start and end date";
-  return `${format(from)} – ${format(to)}`;
+  return `${formatDateDDMMYY(from)} – ${formatDateDDMMYY(to)}`;
 }

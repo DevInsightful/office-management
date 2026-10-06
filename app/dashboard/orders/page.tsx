@@ -9,6 +9,7 @@ import { getOrdersData } from "@/lib/orders";
 import { OrdersFiltersClient } from "@/app/dashboard/orders-filters-client";
 import { getQuickDateRange, isValidDate, isValidDateRange, type QuickDatePreset } from "@/lib/quick-date-range";
 import { getOrdersFilterKey } from "@/lib/orders-filter-key";
+import { formatDateDDMMYY } from "@/lib/date-format";
 
 export default async function OrdersPage({
   searchParams,
@@ -117,10 +118,11 @@ export default async function OrdersPage({
               <p><span className="font-semibold text-slate-900">Note:</span> {selectedOrder.note}</p>
               <p><span className="font-semibold text-slate-900">CSR:</span> {selectedOrder.csrName}</p>
               <p><span className="font-semibold text-slate-900">ID Name:</span> {selectedOrder.idName}</p>
-              <p><span className="font-semibold text-slate-900">Booking Date:</span> {selectedOrder.bookingDate}</p>
-              <p><span className="font-semibold text-slate-900">Delivery Date:</span> {selectedOrder.deliveryDate}</p>
+              <p><span className="font-semibold text-slate-900">Booking Date:</span> {formatDateDDMMYY(selectedOrder.bookingDate)}</p>
+              <p><span className="font-semibold text-slate-900">Delivery Date:</span> {formatDateDDMMYY(selectedOrder.deliveryDate)}</p>
               <p><span className="font-semibold text-slate-900">Customer Name:</span> {selectedOrder.customerName}</p>
               <p><span className="font-semibold text-slate-900">Address:</span> {selectedOrder.address}</p>
+              <p><span className="font-semibold text-slate-900">Postcode:</span> {selectedOrder.postcode || "-"}</p>
               <p><span className="font-semibold text-slate-900">Phone Number:</span> {selectedOrder.phoneNumber}</p>
               <p><span className="font-semibold text-slate-900">Order Details:</span> {selectedOrder.orderDetails}</p>
               <p><span className="font-semibold text-slate-900">Color:</span> {selectedOrder.color}</p>
@@ -189,6 +191,7 @@ export default async function OrdersPage({
               deliveryDate: selectedOrder.deliveryDate,
               customerName: selectedOrder.customerName,
               address: selectedOrder.address,
+              postcode: selectedOrder.postcode,
               phoneNumber: selectedOrder.phoneNumber,
               orderDetails: selectedOrder.orderDetails,
               color: selectedOrder.color,

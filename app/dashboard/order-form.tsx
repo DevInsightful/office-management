@@ -13,6 +13,7 @@ type OrderFormValues = {
   deliveryDate?: string;
   customerName?: string;
   address?: string;
+  postcode?: string;
   phoneNumber?: string;
   orderDetails?: string;
   color?: string;
@@ -75,6 +76,9 @@ export function OrderForm({
       </Field>
       <Field label="Address">
         <textarea name="address" rows={3} defaultValue={initialValues?.address} className={textareaClass} placeholder="41 Ladywell Prospect, Sawbridgeworth..." />
+      </Field>
+      <Field label="Postcode">
+        <input name="postcode" defaultValue={initialValues?.postcode} placeholder="e.g. SG1 2AB" className={inputClass} />
       </Field>
       <Field label="Phone Number">
         <input name="phoneNumber" defaultValue={initialValues?.phoneNumber} placeholder="07846049793" className={inputClass} />

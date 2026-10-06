@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { formatDateDDMMYY } from "@/lib/date-format";
 
 type CopyOrder = {
   bookingDate: string;
   deliveryDate: string;
+  postcode: string;
   customerName: string;
   address: string;
   phoneNumber: string;
@@ -21,11 +23,12 @@ type CopyOrder = {
 
 function buildOrderText(order: CopyOrder, currencyCode: string) {
   const lines = [
-    `Booking Date: ${order.bookingDate}`,
-    `Delivery Date: ${order.deliveryDate}`,
+    `Booking Date: ${formatDateDDMMYY(order.bookingDate)}`,
+    `Delivery Date: ${formatDateDDMMYY(order.deliveryDate)}`,
     "",
     `Customer Name: ${order.customerName}`,
     `Address: ${order.address}`,
+    `Postcode: ${order.postcode || "-"}`,
     `Phone Number: ${order.phoneNumber}`,
     `Order Details: ${order.orderDetails}`,
     `Color: ${order.color}`,

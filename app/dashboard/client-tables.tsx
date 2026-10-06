@@ -26,6 +26,7 @@ import { findCsvColumnIndex } from "@/lib/csv";
 import { FACEBOOK_ID_STATUS_OPTIONS, validateFacebookIdRow } from "@/lib/facebook-id-validation";
 import { parseTabularFile } from "@/lib/spreadsheet";
 import { AttendanceDisplayStatus, formatAttendanceDate, getNonWorkingDayStatus, OFFICE_TIME_ZONE } from "@/lib/attendance-policy";
+import { formatDateDDMMYY } from "@/lib/date-format";
 
 type SortDirection = "asc" | "desc";
 
@@ -39,6 +40,15 @@ function formatAttendanceDateTime(value: string | Date) {
 
 function formatDate(value: string | Date) {
   return new Date(value).toLocaleDateString("en-GB", { timeZone: "Asia/Karachi" });
+}
+
+function formatOrderCreatedDate(value: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Karachi",
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  }).format(new Date(value));
 }
 
 function compareString(left: string, right: string, direction: SortDirection) {
@@ -525,6 +535,7 @@ type OrderRow = {
   csrName: string;
   idName: string;
   customerName: string;
+  postcode: string;
   orderDetails: string;
   bookingDate: string;
   deliveryDate: string;
@@ -557,8 +568,11 @@ export function OrdersTableClient({
           order.csrName,
           order.idName,
           order.customerName,
+          order.postcode,
           order.bookingDate,
+          formatDateDDMMYY(order.bookingDate),
           order.deliveryDate,
+          formatDateDDMMYY(order.deliveryDate),
           order.total,
           canManageStatus ? order.commissionAmount : null,
           order.status,
@@ -608,20 +622,21 @@ export function OrdersTableClient({
       <SearchPanel
         title="Search Orders"
         subtitle="Frontend search plus asc/desc sort on every main order column."
-        placeholder="Search CSR, customer, ID name, dates, total, or status"
+        placeholder="Search CSR, customer, postcode, ID name, dates, total, or status"
         value={search}
         onChange={setSearch}
       />
       <Panel title="All Orders" subtitle="Order list with row click details and instant status updates for managers.">
         <div className="max-w-full overflow-x-auto">
-          <table className={`table-fixed text-sm ${canManageStatus ? "min-w-[1080px]" : "min-w-[980px]"}`}>
+          <table className="table-fixed min-w-[1240px] text-sm">
             <thead className="text-left text-slate-500">
               <tr>
+                <th className="w-[9%] pb-3 pr-3 font-medium"><SortButton label="Booking" active={sort === "bookingDate"} direction={direction} onClick={() => toggleSort("bookingDate")} /></th>
+                <th className="w-[9%] pb-3 pr-3 font-medium"><SortButton label="Delivery" active={sort === "deliveryDate"} direction={direction} onClick={() => toggleSort("deliveryDate")} /></th>
                 <th className="w-[14%] pb-3 pr-3 font-medium"><SortButton label="CSR" active={sort === "csrName"} direction={direction} onClick={() => toggleSort("csrName")} /></th>
                 <th className="w-[12%] pb-3 pr-3 font-medium"><SortButton label="ID Name" active={sort === "idName"} direction={direction} onClick={() => toggleSort("idName")} /></th>
                 <th className="w-[20%] pb-3 pr-3 font-medium"><SortButton label="Customer" active={sort === "customerName"} direction={direction} onClick={() => toggleSort("customerName")} /></th>
-                <th className="w-[12%] pb-3 pr-3 font-medium"><SortButton label="Booking" active={sort === "bookingDate"} direction={direction} onClick={() => toggleSort("bookingDate")} /></th>
-                <th className="w-[12%] pb-3 pr-3 font-medium"><SortButton label="Delivery" active={sort === "deliveryDate"} direction={direction} onClick={() => toggleSort("deliveryDate")} /></th>
+                <th className="w-[9%] pb-3 pr-3 font-medium">Postcode</th>
                 <th className="w-[10%] pb-3 pr-3 font-medium"><SortButton label="Total" active={sort === "total"} direction={direction} onClick={() => toggleSort("total")} /></th>
                 {canManageStatus ? <th className="w-[10%] pb-3 pr-3 font-medium">Commission</th> : null}
                 <th className="w-[12%] pb-3 pr-3 font-medium"><SortButton label="Status" active={sort === "status"} direction={direction} onClick={() => toggleSort("status")} /></th>
@@ -645,6 +660,8 @@ export function OrdersTableClient({
                   }}
                   className="cursor-pointer transition hover:bg-slate-50/80 focus:outline-none focus:ring-2 focus:ring-amber-300"
                 >
+                  <td className="whitespace-nowrap py-3 pr-3 text-slate-600">{formatDateDDMMYY(order.bookingDate)}</td>
+                  <td className="whitespace-nowrap py-3 pr-3 text-slate-600">{formatDateDDMMYY(order.deliveryDate)}</td>
                   <td className="py-3 pr-3 font-medium text-slate-900">{order.csrName}</td>
                   <td className="py-3 pr-3 text-slate-600">{order.idName}</td>
                   <td className="py-3 pr-3 text-slate-600">
@@ -653,8 +670,7 @@ export function OrdersTableClient({
                       <p className="mt-1 line-clamp-2 break-words text-xs text-slate-500">{order.orderDetails}</p>
                     </div>
                   </td>
-                  <td className="py-3 pr-3 text-slate-600">{order.bookingDate}</td>
-                  <td className="py-3 pr-3 text-slate-600">{order.deliveryDate}</td>
+                  <td className="py-3 pr-3 text-slate-600">{order.postcode || "-"}</td>
                   <td className="py-3 pr-3 font-semibold">{currency(order.total, currencyCode)}</td>
                   {canManageStatus ? <td className="py-3 pr-3 font-semibold text-slate-700">{currency(order.commissionAmount, currencyCode)}</td> : null}
                   <td className="py-3 pr-3">
@@ -686,7 +702,7 @@ export function OrdersTableClient({
                       <Badge>{order.status}</Badge>
                     )}
                   </td>
-                  <td className="py-3 pr-3 text-slate-600">{formatDate(order.createdAt)}</td>
+                  <td className="py-3 pr-3 text-slate-600">{formatOrderCreatedDate(order.createdAt)}</td>
                   <td className="py-3 pr-3">
                     <Link
                       href={order.imageUrl}
