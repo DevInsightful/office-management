@@ -34,8 +34,8 @@ export function OrdersFilterNavigation({ children, activeKey }: { children: Reac
 
   const retry = useCallback(() => {
     setFailedKey(null);
-    startTransition(() => router.refresh());
-  }, [router]);
+    window.location.reload();
+  }, []);
 
   const awaitingResults = pendingKey !== null && pendingKey !== activeKey;
   const hasError = awaitingResults && failedKey === pendingKey;
@@ -81,7 +81,7 @@ export function OrdersFilterResults({ children }: { children: ReactNode }) {
             {hasError ? (
               <>
                 <span>Orders are taking too long to load.</span>
-                <button type="button" onClick={retry} className="rounded-lg bg-slate-950 px-3 py-2 text-white hover:bg-slate-800">Retry</button>
+                <button type="button" onClick={retry} className="rounded-lg bg-slate-950 px-3 py-2 text-white hover:bg-slate-800">Reload orders</button>
               </>
             ) : (
               <>

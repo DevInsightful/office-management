@@ -1,6 +1,5 @@
 import { SessionUser } from "@/lib/auth";
 import { ensureDb, sql } from "@/lib/db";
-import { seedIfEmpty } from "@/lib/seed";
 import { CurrencyCode } from "@/lib/currency";
 import { getCurrencySetting } from "@/lib/settings";
 import { buildPublicStorageUrl } from "@/lib/supabase";
@@ -36,6 +35,11 @@ type OrderRow = {
   description: string;
   image_url: string;
   commission_amount: string;
+  notes: string;
+  supplier_id: number | null;
+  supplier_name: string | null;
+  vendor_cost: string;
+  profit: string;
   status: OrderStatus;
   created_at: string;
   updated_at: string;
@@ -75,6 +79,11 @@ export type OrdersData = {
     description: string;
     imageUrl: string;
     commissionAmount: number;
+    notes: string;
+    supplierId: number | null;
+    supplierName: string | null;
+    vendorCost: number;
+    profit: number;
     status: OrderStatus;
     createdAt: string;
     updatedAt: string;
@@ -92,7 +101,6 @@ export async function getOrdersData(
   dateField: OrdersDateField = "booking",
 ): Promise<OrdersData> {
   await ensureDb();
-  await seedIfEmpty();
 
   const currencyCode = await getCurrencySetting();
 
@@ -123,6 +131,11 @@ export async function getOrdersData(
             o.description,
             o.image_url,
             o.commission_amount::text,
+            o.notes,
+            o.supplier_id,
+            s.name as supplier_name,
+            o.vendor_cost::text,
+            o.profit::text,
             o.status,
             o.created_at::text,
             o.updated_at::text,
@@ -131,6 +144,7 @@ export async function getOrdersData(
             u.role as csr_role
           from orders o
           join users u on u.id = o.csr_user_id
+          left join suppliers s on s.id = o.supplier_id
           where (${user.role !== "employee"} or o.csr_user_id = ${user.id})
             and (${fromDate}::date is null or (case when ${dateField === "delivery"} then o.delivery_date else o.booking_date end) >= ${fromDate}::date)
             and (${toDate}::date is null or (case when ${dateField === "delivery"} then o.delivery_date else o.booking_date end) <= ${toDate}::date)
@@ -158,6 +172,11 @@ export async function getOrdersData(
     description: row.description,
     imageUrl: buildPublicStorageUrl(row.image_url),
     commissionAmount: Number(row.commission_amount),
+    notes: row.notes,
+    supplierId: user.role === "employee" ? null : row.supplier_id,
+    supplierName: user.role === "employee" ? null : row.supplier_name,
+    vendorCost: user.role === "employee" ? 0 : Number(row.total) - Number(row.profit),
+    profit: user.role === "employee" ? 0 : Number(row.profit),
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

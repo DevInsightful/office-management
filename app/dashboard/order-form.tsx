@@ -23,6 +23,8 @@ type OrderFormValues = {
   freeParking?: boolean;
   paymentMethod?: string;
   description?: string;
+  notes?: string;
+  supplierId?: number | null;
 };
 
 export function OrderForm({
@@ -32,6 +34,8 @@ export function OrderForm({
   pendingLabel,
   initialValues,
   requireImage = true,
+  suppliers = [],
+  isAdmin = false,
 }: {
   today: string;
   action: (formData: FormData) => void | Promise<void>;
@@ -39,6 +43,8 @@ export function OrderForm({
   pendingLabel: string;
   initialValues?: OrderFormValues;
   requireImage?: boolean;
+  suppliers?: { id: number; name: string }[];
+  isAdmin?: boolean;
 }) {
   const [price, setPrice] = useState(initialValues?.price ? String(initialValues.price) : "");
   const [deliveryMode, setDeliveryMode] = useState(initialValues?.freeDelivery === false ? "paid" : "free");
@@ -60,6 +66,17 @@ export function OrderForm({
       <Field label="Note">
         <input name="note" defaultValue={initialValues?.note} placeholder="Delivery will be Wednesday" className={inputClass} />
       </Field>
+      {isAdmin ? <Field label="Notes (visible to everyone)">
+        <textarea name="notes" rows={3} defaultValue={initialValues?.notes} className={textareaClass} placeholder="Order notes" />
+      </Field> : null}
+      {isAdmin ? <>
+        <Field label="Supplier / Vendor">
+          <select name="supplierId" defaultValue={initialValues?.supplierId ?? ""} className={inputClass}>
+            <option value="">No supplier selected</option>
+            {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
+          </select>
+        </Field>
+      </> : null}
       <Field label="ID Name">
         <input name="idName" defaultValue={initialValues?.idName} placeholder="WhatsApp" className={inputClass} />
       </Field>

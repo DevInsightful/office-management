@@ -537,6 +537,7 @@ type OrderRow = {
   customerName: string;
   postcode: string;
   orderDetails: string;
+  notes: string;
   bookingDate: string;
   deliveryDate: string;
   total: number;
@@ -568,6 +569,7 @@ export function OrdersTableClient({
           order.csrName,
           order.idName,
           order.customerName,
+          order.notes,
           order.postcode,
           order.bookingDate,
           formatDateDDMMYY(order.bookingDate),
@@ -617,6 +619,13 @@ export function OrdersTableClient({
     setSort(nextSort);
   }
 
+  function openOrder(orderId: number) {
+    const params = new URLSearchParams(window.location.search);
+    params.set("modal", "details");
+    params.set("order", String(orderId));
+    router.push(`${window.location.pathname}?${params.toString()}`);
+  }
+
   return (
     <section className="grid gap-4">
       <SearchPanel
@@ -651,11 +660,11 @@ export function OrdersTableClient({
                   key={order.id}
                   role="button"
                   tabIndex={0}
-                  onClick={() => router.push(`/dashboard/orders?modal=details&order=${order.id}`)}
+                  onClick={() => openOrder(order.id)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      router.push(`/dashboard/orders?modal=details&order=${order.id}`);
+                      openOrder(order.id);
                     }
                   }}
                   className="cursor-pointer transition hover:bg-slate-50/80 focus:outline-none focus:ring-2 focus:ring-amber-300"
@@ -668,6 +677,7 @@ export function OrdersTableClient({
                     <div>
                       <p className="break-words font-medium text-slate-900">{order.customerName}</p>
                       <p className="mt-1 line-clamp-2 break-words text-xs text-slate-500">{order.orderDetails}</p>
+                      {order.notes ? <p title={order.notes} className="mt-2 line-clamp-2 break-words rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900"><span className="font-semibold">Notes:</span> {order.notes}</p> : null}
                     </div>
                   </td>
                   <td className="py-3 pr-3 text-slate-600">{order.postcode || "-"}</td>

@@ -1,4 +1,4 @@
-import { createOrderAction, deleteOrderAction, updateOrderAction, updateOrderCommissionAction } from "@/app/actions";
+import { createOrderAction, deleteOrderAction, updateOrderAction, updateOrderCommissionAction, updateOrderVendorFinanceAction } from "@/app/actions";
 import { OrdersTableClient } from "@/app/dashboard/client-tables";
 import { OrderForm } from "@/app/dashboard/order-form";
 import { OrderCopyButton } from "@/app/dashboard/order-copy-button";
@@ -10,6 +10,7 @@ import { OrdersFiltersClient } from "@/app/dashboard/orders-filters-client";
 import { getQuickDateRange, isValidDate, isValidDateRange, type QuickDatePreset } from "@/lib/quick-date-range";
 import { getOrdersFilterKey } from "@/lib/orders-filter-key";
 import { formatDateDDMMYY } from "@/lib/date-format";
+import { ensureDb, sql } from "@/lib/db";
 
 export default async function OrdersPage({
   searchParams,
@@ -33,6 +34,8 @@ export default async function OrdersPage({
   const user = await requireUser();
   const data = await getOrdersData(user, dateRange, dateField);
   const canManageStatus = user.role !== "employee";
+  await ensureDb();
+  const suppliers = canManageStatus ? await sql<{ id: number; name: string }[]>`select id, name from suppliers order by name` : [];
   const modal = params?.modal;
   const selectedOrderId = Number(params?.order ?? 0);
   const selectedOrder = data.orders.find((order) => order.id === selectedOrderId) ?? null;
@@ -88,6 +91,8 @@ export default async function OrdersPage({
           <OrderForm
             today={today}
             action={createOrderAction}
+            suppliers={suppliers}
+            isAdmin={canManageStatus}
             submitLabel="Create order"
             pendingLabel="Creating order..."
           />
@@ -134,6 +139,13 @@ export default async function OrdersPage({
               <p><span className="font-semibold text-slate-900">Payment Method:</span> {selectedOrder.paymentMethod}</p>
               <p><span className="font-semibold text-slate-900">Status:</span> {selectedOrder.status}</p>
               {canManageStatus ? <p><span className="font-semibold text-slate-900">Commission:</span> {currency(selectedOrder.commissionAmount, data.currency)}</p> : null}
+              {canManageStatus ? <>
+                <p><span className="font-semibold text-slate-900">Vendor:</span> {selectedOrder.supplierName || "-"}</p>
+                <p><span className="font-semibold text-slate-900">Vendor Cost (calculated):</span> {currency(selectedOrder.vendorCost, data.currency)}</p>
+                <p><span className="font-semibold text-slate-900">Profit:</span> {currency(selectedOrder.profit, data.currency)}</p>
+              </> : null}
+              <p><span className="font-semibold text-slate-900">Notes:</span> {selectedOrder.notes || "-"}</p>
+              <p><span className="font-semibold text-slate-900">Notes:</span> {selectedOrder.notes || "-"}</p>
               <p><span className="font-semibold text-slate-900">Description:</span> {selectedOrder.description || "No extra description."}</p>
             </div>
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
@@ -168,6 +180,26 @@ export default async function OrdersPage({
               </div>
             </form>
           ) : null}
+          {canManageStatus ? (
+            <form action={updateOrderVendorFinanceAction} className="mt-4 rounded-3xl border border-amber-200 bg-amber-50/60 p-4">
+              <input type="hidden" name="orderId" value={selectedOrder.id} />
+              <p className="mb-3 text-sm font-semibold text-slate-900">Supplier and order profit</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-sm font-medium text-slate-700">Supplier
+                  <select name="supplierId" defaultValue={selectedOrder.supplierId ?? ""} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none">
+                    <option value="">No supplier selected</option>
+                    {suppliers.map((supplier: { id: number; name: string }) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
+                  </select>
+                </label>
+                {selectedOrder.status === "delivered" ? <label className="text-sm font-medium text-slate-700">Profit
+                  <input name="profit" type="number" min="0" step="0.01" defaultValue={selectedOrder.profit} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+                </label> : <p className="self-center text-sm text-slate-600">Profit can be entered after this order is delivered.</p>}
+              </div>
+              <div className="mt-3 flex justify-end">
+                <PendingSubmitButton idleLabel="Save" pendingLabel="Saving..." className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800" pendingClassName="cursor-not-allowed bg-slate-700" />
+              </div>
+            </form>
+          ) : null}
         </ModalFrame>
       )}
 
@@ -183,6 +215,8 @@ export default async function OrdersPage({
             submitLabel="Update order"
             pendingLabel="Updating order..."
             requireImage={false}
+            suppliers={suppliers}
+            isAdmin={canManageStatus}
             initialValues={{
               id: selectedOrder.id,
               note: selectedOrder.note,
@@ -201,6 +235,8 @@ export default async function OrdersPage({
               freeParking: selectedOrder.freeParking,
               paymentMethod: selectedOrder.paymentMethod,
               description: selectedOrder.description,
+              notes: selectedOrder.notes,
+              supplierId: selectedOrder.supplierId,
             }}
           />
         </ModalFrame>

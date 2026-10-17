@@ -799,10 +799,14 @@ export async function createOrderAction(formData: FormData) {
   const freeParking = cleanBoolean(formData.get("freeParking"));
   const paymentMethod = cleanText(formData.get("paymentMethod"));
   const description = cleanText(formData.get("description"));
+  const orderNotes = actor.role === "employee" ? "" : cleanText(formData.get("notes"));
+  const supplierId = actor.role === "employee" ? null : cleanNumber(formData.get("supplierId")) || null;
+  const profit = 0;
   const image = formData.get("image");
   const normalizedFreeDelivery = deliveryMode === "paid" ? false : freeDelivery || deliveryMode === "free";
   const normalizedDeliveryPrice = normalizedFreeDelivery ? 0 : deliveryPrice;
   const total = price + normalizedDeliveryPrice;
+  const vendorCost = total - profit;
 
   if (
     !note ||
@@ -859,7 +863,11 @@ export async function createOrderAction(formData: FormData) {
       total,
       payment_method,
       description,
-      image_url
+      image_url,
+      notes,
+      supplier_id,
+      vendor_cost,
+      profit
     )
     values (
       ${actor.id},
@@ -880,7 +888,11 @@ export async function createOrderAction(formData: FormData) {
       ${total},
       ${paymentMethod},
       ${description},
-      ${filePath}
+      ${filePath},
+      ${orderNotes},
+      ${supplierId},
+      ${vendorCost},
+      ${profit}
     )
   `;
 
@@ -907,6 +919,41 @@ export async function updateOrderStatusAction(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/orders");
+}
+
+export async function createSupplierAction(formData: FormData) {
+  await requireAdmin();
+  const name = cleanText(formData.get("name"));
+  if (!name) redirect("/dashboard/suppliers?error=name_required");
+  await sql`insert into suppliers (name, phone, company, address) values (
+    ${name}, ${cleanText(formData.get("phone")) || null},
+    ${cleanText(formData.get("company")) || null}, ${cleanText(formData.get("address")) || null}
+  )`;
+  revalidatePath("/dashboard/suppliers");
+  redirect("/dashboard/suppliers");
+}
+
+export async function updateSupplierAction(formData: FormData) {
+  await requireAdmin();
+  const id = cleanNumber(formData.get("supplierId"));
+  const name = cleanText(formData.get("name"));
+  if (!id || !name) redirect("/dashboard/suppliers?error=name_required");
+  await sql`update suppliers set name=${name}, phone=${cleanText(formData.get("phone")) || null},
+    company=${cleanText(formData.get("company")) || null}, address=${cleanText(formData.get("address")) || null} where id=${id}`;
+  revalidatePath("/dashboard/suppliers");
+  revalidatePath(`/dashboard/suppliers/${id}`);
+  redirect(`/dashboard/suppliers/${id}`);
+}
+
+export async function deleteSupplierAction(formData: FormData) {
+  await requireAdmin();
+  const id = cleanNumber(formData.get("supplierId"));
+  if (!id) redirect("/dashboard/suppliers?error=invalid_supplier");
+  await sql`delete from suppliers where id=${id}`;
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/orders");
+  revalidatePath("/dashboard/suppliers");
+  redirect("/dashboard/suppliers");
 }
 
 export async function updateOrderCommissionAction(formData: FormData) {
@@ -944,6 +991,37 @@ export async function updateOrderCommissionAction(formData: FormData) {
   redirect(`/dashboard/orders?modal=details&order=${orderId}`);
 }
 
+export async function updateOrderVendorFinanceAction(formData: FormData) {
+  await requireAdmin();
+  const orderId = cleanNumber(formData.get("orderId"));
+  const rawSupplierId = cleanText(formData.get("supplierId"));
+  const supplierId = rawSupplierId ? Number(rawSupplierId) : null;
+  const profitRaw = cleanText(formData.get("profit"));
+  const profit = profitRaw ? Number(profitRaw) : null;
+  if (!orderId || (rawSupplierId && (!Number.isInteger(supplierId) || Number(supplierId) < 1)) || (profit !== null && (!Number.isFinite(profit) || profit < 0))) {
+    redirect(`/dashboard/orders?modal=details&order=${orderId}&error=invalid_vendor_finance`);
+  }
+  const orderRows = await sql<{ status: string; total: string }[]>`select status, total::text from orders where id=${orderId} limit 1`;
+  const order = orderRows[0];
+  if (!order || (profit !== null && order.status !== "delivered")) {
+    redirect(`/dashboard/orders?modal=details&order=${orderId}&error=profit_requires_delivered`);
+  }
+  if (profit !== null && profit > Number(order.total)) {
+    redirect(`/dashboard/orders?modal=details&order=${orderId}&error=invalid_vendor_finance`);
+  }
+  await sql`
+    update orders set
+      supplier_id = ${supplierId},
+      profit = coalesce(${profit}, profit),
+      vendor_cost = case when ${profit}::numeric is null then vendor_cost else total - ${profit} end,
+      updated_at = now()
+    where id = ${orderId}
+  `;
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/orders");
+  redirect(`/dashboard/orders?modal=details&order=${orderId}`);
+}
+
 export async function updateOrderAction(formData: FormData) {
   const actor = await requireUser();
 
@@ -965,6 +1043,8 @@ export async function updateOrderAction(formData: FormData) {
   const freeParking = cleanBoolean(formData.get("freeParking"));
   const paymentMethod = cleanText(formData.get("paymentMethod"));
   const description = cleanText(formData.get("description"));
+  const orderNotes = actor.role === "employee" ? null : cleanText(formData.get("notes"));
+  const supplierId = cleanNumber(formData.get("supplierId")) || null;
   const normalizedFreeDelivery = deliveryMode === "paid" ? false : freeDelivery || deliveryMode === "free";
   const normalizedDeliveryPrice = normalizedFreeDelivery ? 0 : deliveryPrice;
   const total = price + normalizedDeliveryPrice;
@@ -1019,8 +1099,11 @@ export async function updateOrderAction(formData: FormData) {
       delivery_price = ${normalizedDeliveryPrice},
       free_parking = ${freeParking},
       total = ${total},
+      vendor_cost = ${total} - profit,
       payment_method = ${paymentMethod},
       description = ${description},
+      notes = coalesce(${orderNotes}, notes),
+      supplier_id = case when ${actor.role === "employee"} then supplier_id else ${supplierId} end,
       updated_at = now()
     where id = ${orderId}
   `;

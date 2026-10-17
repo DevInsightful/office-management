@@ -13,6 +13,7 @@ const adminNav = [
   { href: "/dashboard/profile", label: "Profile" },
   { href: "/dashboard/attendance", label: "Attendance" },
   { href: "/dashboard/orders", label: "Orders" },
+  { href: "/dashboard/suppliers", label: "Suppliers" },
   { href: "/dashboard/finance", label: "Finance" },
   { href: "/dashboard/employees", label: "Employees" },
   { href: "/dashboard/facebook-ids", label: "Facebook IDs" },

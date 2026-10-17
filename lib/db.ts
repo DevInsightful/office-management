@@ -6,7 +6,7 @@ declare global {
   var __officeBootstrapVersion: number | undefined;
 }
 
-const DB_SCHEMA_VERSION = 3;
+const DB_SCHEMA_VERSION = 8;
 
 function getConnectionString() {
   const connectionString = process.env.DATABASE_URL;
@@ -308,6 +308,37 @@ async function bootstrap() {
       updated_at timestamptz not null default now()
     );
   `;
+
+  await sql`create table if not exists suppliers (
+    id serial primary key,
+    name text not null,
+    phone text,
+    company text,
+    address text,
+    created_at timestamptz not null default now()
+  )`;
+  await sql`alter table suppliers add column if not exists phone text`;
+  await sql`alter table suppliers add column if not exists company text`;
+  await sql`alter table suppliers add column if not exists address text`;
+  await sql`alter table orders add column if not exists supplier_id integer references suppliers(id) on delete set null`;
+  await sql`alter table orders add column if not exists notes text not null default ''`;
+  await sql`alter table orders add column if not exists admin_notes text not null default ''`;
+  await sql`
+    update orders
+    set notes = case
+      when notes = '' then admin_notes
+      when admin_notes = '' or notes = admin_notes then notes
+      else notes || E'\\n' || admin_notes
+    end,
+    admin_notes = ''
+    where admin_notes <> ''
+  `;
+  await sql`alter table orders add column if not exists vendor_cost numeric(12, 2) not null default 0`;
+  await sql`alter table orders add column if not exists profit numeric(12, 2) not null default 0`;
+  await sql`create index if not exists orders_created_at_idx on orders (created_at desc)`;
+  await sql`create index if not exists orders_csr_created_at_idx on orders (csr_user_id, created_at desc)`;
+  await sql`create index if not exists orders_booking_date_created_at_idx on orders (booking_date, created_at desc)`;
+  await sql`create index if not exists orders_delivery_date_created_at_idx on orders (delivery_date, created_at desc)`;
 
   await sql`
     alter table orders
