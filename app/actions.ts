@@ -801,12 +801,12 @@ export async function createOrderAction(formData: FormData) {
   const description = cleanText(formData.get("description"));
   const orderNotes = actor.role === "employee" ? "" : cleanText(formData.get("notes"));
   const supplierId = actor.role === "employee" ? null : cleanNumber(formData.get("supplierId")) || null;
-  const profit = 0;
+  const profit = null;
   const image = formData.get("image");
   const normalizedFreeDelivery = deliveryMode === "paid" ? false : freeDelivery || deliveryMode === "free";
   const normalizedDeliveryPrice = normalizedFreeDelivery ? 0 : deliveryPrice;
   const total = price + normalizedDeliveryPrice;
-  const vendorCost = total - profit;
+  const vendorCost = total;
 
   if (
     !note ||
@@ -1099,7 +1099,7 @@ export async function updateOrderAction(formData: FormData) {
       delivery_price = ${normalizedDeliveryPrice},
       free_parking = ${freeParking},
       total = ${total},
-      vendor_cost = ${total} - profit,
+      vendor_cost = case when profit is null then vendor_cost else ${total} - profit end,
       payment_method = ${paymentMethod},
       description = ${description},
       notes = coalesce(${orderNotes}, notes),

@@ -39,7 +39,7 @@ type OrderRow = {
   supplier_id: number | null;
   supplier_name: string | null;
   vendor_cost: string;
-  profit: string;
+  profit: string | null;
   status: OrderStatus;
   created_at: string;
   updated_at: string;
@@ -57,6 +57,7 @@ export type OrdersData = {
     pendingOrders: number;
     totalOrderValue: number;
     commissionEarned: number;
+    totalProfit: number;
   };
   orders: {
     id: number;
@@ -83,7 +84,7 @@ export type OrdersData = {
     supplierId: number | null;
     supplierName: string | null;
     vendorCost: number;
-    profit: number;
+    profit: number | null;
     status: OrderStatus;
     createdAt: string;
     updatedAt: string;
@@ -175,8 +176,8 @@ export async function getOrdersData(
     notes: row.notes,
     supplierId: user.role === "employee" ? null : row.supplier_id,
     supplierName: user.role === "employee" ? null : row.supplier_name,
-    vendorCost: user.role === "employee" ? 0 : Number(row.total) - Number(row.profit),
-    profit: user.role === "employee" ? 0 : Number(row.profit),
+    vendorCost: user.role === "employee" || row.profit === null ? 0 : Number(row.total) - Number(row.profit),
+    profit: user.role === "employee" ? 0 : row.profit === null ? null : Number(row.profit),
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -194,6 +195,10 @@ export async function getOrdersData(
       pendingOrders: orders.filter((order: OrderItem) => order.status === "pending").length,
       totalOrderValue: orders.reduce((sum: number, order: OrderItem) => sum + order.total, 0),
       commissionEarned: orders.reduce((sum: number, order: OrderItem) => sum + order.commissionAmount, 0),
+      totalProfit: orders.reduce(
+        (sum: number, order: OrderItem) => sum + (order.profit ?? 0),
+        0,
+      ),
     },
     orders,
   };

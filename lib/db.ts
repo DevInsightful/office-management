@@ -6,7 +6,7 @@ declare global {
   var __officeBootstrapVersion: number | undefined;
 }
 
-const DB_SCHEMA_VERSION = 8;
+const DB_SCHEMA_VERSION = 9;
 
 function getConnectionString() {
   const connectionString = process.env.DATABASE_URL;
@@ -361,6 +361,14 @@ async function bootstrap() {
       value text not null,
       updated_at timestamptz not null default now()
     );
+  `;
+
+  await sql`alter table orders alter column profit drop default`;
+  await sql`alter table orders alter column profit drop not null`;
+  await sql`
+    insert into app_settings (key, value)
+    values ('order_profit_commission_separation_v1', 'complete')
+    on conflict (key) do nothing
   `;
 
   await sql`

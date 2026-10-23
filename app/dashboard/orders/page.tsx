@@ -72,9 +72,10 @@ export default async function OrdersPage({
             <MetricCard label="Pending" value={String(data.metrics.pendingOrders)} tone="violet" />
           </section>
 
-          <section aria-label="Order financial insights" className="mt-4 grid gap-4 md:grid-cols-2">
+          <section aria-label="Order financial insights" className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <MetricCard label="Total Order Value" value={currency(data.metrics.totalOrderValue, data.currency)} tone="sky" />
             <MetricCard label="Commission Earned" value={currency(data.metrics.commissionEarned, data.currency)} tone="emerald" />
+            {canManageStatus ? <MetricCard label="Total Profit" value={currency(data.metrics.totalProfit, data.currency)} tone="amber" /> : null}
           </section>
 
           <div className="mt-4">
@@ -141,8 +142,8 @@ export default async function OrdersPage({
               {canManageStatus ? <p><span className="font-semibold text-slate-900">Commission:</span> {currency(selectedOrder.commissionAmount, data.currency)}</p> : null}
               {canManageStatus ? <>
                 <p><span className="font-semibold text-slate-900">Vendor:</span> {selectedOrder.supplierName || "-"}</p>
-                <p><span className="font-semibold text-slate-900">Vendor Cost (calculated):</span> {currency(selectedOrder.vendorCost, data.currency)}</p>
-                <p><span className="font-semibold text-slate-900">Profit:</span> {currency(selectedOrder.profit, data.currency)}</p>
+                <p><span className="font-semibold text-slate-900">Vendor Cost (calculated):</span> {selectedOrder.profit === null ? "—" : currency(selectedOrder.vendorCost, data.currency)}</p>
+                <p><span className="font-semibold text-slate-900">Profit:</span> {selectedOrder.status === "delivered" && selectedOrder.profit === null ? "Delivered but profit not added" : selectedOrder.profit === null ? "—" : currency(selectedOrder.profit, data.currency)}</p>
               </> : null}
               <p><span className="font-semibold text-slate-900">Notes:</span> {selectedOrder.notes || "-"}</p>
               <p><span className="font-semibold text-slate-900">Notes:</span> {selectedOrder.notes || "-"}</p>
@@ -161,7 +162,7 @@ export default async function OrdersPage({
               <input type="hidden" name="orderId" value={selectedOrder.id} />
               <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Commission for CSR</label>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Employee CSR commission</label>
                   <input
                     name="commissionAmount"
                     type="number"
@@ -192,7 +193,7 @@ export default async function OrdersPage({
                   </select>
                 </label>
                 {selectedOrder.status === "delivered" ? <label className="text-sm font-medium text-slate-700">Profit
-                  <input name="profit" type="number" min="0" step="0.01" defaultValue={selectedOrder.profit} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+                  <input name="profit" type="number" min="0" step="0.01" defaultValue={selectedOrder.profit ?? ""} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
                 </label> : <p className="self-center text-sm text-slate-600">Profit can be entered after this order is delivered.</p>}
               </div>
               <div className="mt-3 flex justify-end">

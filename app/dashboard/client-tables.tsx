@@ -542,6 +542,7 @@ type OrderRow = {
   deliveryDate: string;
   total: number;
   commissionAmount: number;
+  profit: number | null;
   status: string;
   imageUrl: string;
   createdAt: string;
@@ -558,7 +559,7 @@ export function OrdersTableClient({
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<"csrName" | "idName" | "customerName" | "bookingDate" | "deliveryDate" | "total" | "status">("bookingDate");
+  const [sort, setSort] = useState<"csrName" | "idName" | "customerName" | "bookingDate" | "deliveryDate" | "total" | "profit" | "status">("bookingDate");
   const [direction, setDirection] = useState<SortDirection>("desc");
 
   const filteredOrders = useMemo(() => {
@@ -581,8 +582,10 @@ export function OrdersTableClient({
         ),
       )
       .sort((left, right) => {
-        if (sort === "total") {
-          return compareNumber(left.total, right.total, direction);
+        if (sort === "total" || sort === "profit") {
+          const leftValue = sort === "total" ? left.total : left.profit ?? Number.NEGATIVE_INFINITY;
+          const rightValue = sort === "total" ? right.total : right.profit ?? Number.NEGATIVE_INFINITY;
+          return compareNumber(leftValue, rightValue, direction);
         }
 
         const leftValue =
@@ -647,7 +650,7 @@ export function OrdersTableClient({
                 <th className="w-[20%] pb-3 pr-3 font-medium"><SortButton label="Customer" active={sort === "customerName"} direction={direction} onClick={() => toggleSort("customerName")} /></th>
                 <th className="w-[9%] pb-3 pr-3 font-medium">Postcode</th>
                 <th className="w-[10%] pb-3 pr-3 font-medium"><SortButton label="Total" active={sort === "total"} direction={direction} onClick={() => toggleSort("total")} /></th>
-                {canManageStatus ? <th className="w-[10%] pb-3 pr-3 font-medium">Commission</th> : null}
+                {canManageStatus ? <th className="w-[10%] pb-3 pr-3 font-medium"><SortButton label="Profit" active={sort === "profit"} direction={direction} onClick={() => toggleSort("profit")} /></th> : null}
                 <th className="w-[12%] pb-3 pr-3 font-medium"><SortButton label="Status" active={sort === "status"} direction={direction} onClick={() => toggleSort("status")} /></th>
                 <th className="w-[10%] pb-3 pr-3 font-medium">Created</th>
                 <th className="w-[8%] pb-3 pr-3 font-medium">Image</th>
@@ -682,32 +685,45 @@ export function OrdersTableClient({
                   </td>
                   <td className="py-3 pr-3 text-slate-600">{order.postcode || "-"}</td>
                   <td className="py-3 pr-3 font-semibold">{currency(order.total, currencyCode)}</td>
-                  {canManageStatus ? <td className="py-3 pr-3 font-semibold text-slate-700">{currency(order.commissionAmount, currencyCode)}</td> : null}
+                  {canManageStatus ? (
+                    <td className="py-3 pr-3 font-semibold text-emerald-700">
+                      {order.status !== "delivered"
+                        ? "—"
+                        : order.profit === null
+                          ? "Profit not added"
+                          : currency(order.profit, currencyCode)}
+                    </td>
+                  ) : null}
                   <td className="py-3 pr-3">
                     {canManageStatus ? (
-                      <form
-                        action={updateOrderStatusAction}
-                        className="inline-flex items-center gap-2"
-                        onClick={(event) => event.stopPropagation()}
-                        onKeyDown={(event) => event.stopPropagation()}
-                      >
-                        <input type="hidden" name="orderId" value={order.id} />
-                        <select
-                          key={order.status}
-                          name="status"
-                          defaultValue={order.status}
-                          aria-label={`Update status for order ${order.id}`}
-                          onChange={(event) => event.currentTarget.form?.requestSubmit()}
-                          className="min-w-[150px] rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-slate-900 outline-none transition hover:border-slate-300 focus:border-amber-400"
+                      <div>
+                        <form
+                          action={updateOrderStatusAction}
+                          className="inline-flex items-center gap-2"
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
                         >
-                          <option value="pending">Pending</option>
-                          <option value="approved">Approved</option>
-                          <option value="rejected">Rejected</option>
-                          <option value="cancelled">Cancelled</option>
-                          <option value="delivered">Delivered</option>
-                        </select>
-                        <InlinePendingState pendingLabel="Saving..." />
-                      </form>
+                          <input type="hidden" name="orderId" value={order.id} />
+                          <select
+                            key={order.status}
+                            name="status"
+                            defaultValue={order.status}
+                            aria-label={`Update status for order ${order.id}`}
+                            onChange={(event) => event.currentTarget.form?.requestSubmit()}
+                            className="min-w-[150px] rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-slate-900 outline-none transition hover:border-slate-300 focus:border-amber-400"
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="cancelled">Cancelled</option>
+                            <option value="delivered">Delivered</option>
+                          </select>
+                          <InlinePendingState pendingLabel="Saving..." />
+                        </form>
+                        {order.status === "delivered" && order.profit === null ? (
+                          <p className="mt-1 text-xs font-medium text-amber-700">Delivered but profit not added</p>
+                        ) : null}
+                      </div>
                     ) : (
                       <Badge>{order.status}</Badge>
                     )}

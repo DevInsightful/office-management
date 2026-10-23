@@ -32,9 +32,9 @@ export default async function SupplierDetailPage({
       coalesce(sum(profit),0)::text profit, coalesce(sum(total),0)::text order_value
     from orders where supplier_id=${id}`;
   const stats = rows[0];
-  const deliveredOrders = await sql<{ id: number; customer_name: string; booking_date: string; delivery_date: string; total: string; profit: string }[]>`
-    select id, customer_name, booking_date::text, delivery_date::text, total::text, profit::text
-    from orders where supplier_id=${id} and status='delivered' order by delivery_date desc, id desc`;
+  const supplierOrders = await sql<{ id: number; customer_name: string; booking_date: string; delivery_date: string; total: string; profit: string | null; status: string }[]>`
+    select id, customer_name, booking_date::text, delivery_date::text, total::text, profit::text, status
+    from orders where supplier_id=${id} order by delivery_date desc, id desc`;
   const currencyCode = await getCurrencySetting();
   const isEditModalOpen = query?.modal === "edit";
 
@@ -76,31 +76,33 @@ export default async function SupplierDetailPage({
       </div>
     </Panel>
 
-    <Panel title="Delivered orders" subtitle={`${deliveredOrders.length} orders delivered by ${supplier.name}`}>
-      {deliveredOrders.length ? <div className="overflow-x-auto">
-        <table className="w-full min-w-[680px] text-left text-sm">
+    <Panel title="Assigned orders" subtitle={`${supplierOrders.length} orders assigned to ${supplier.name}`}>
+      {supplierOrders.length ? <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="text-xs uppercase tracking-wide text-slate-500"><tr>
             <th className="pb-3 pr-4 font-semibold">Order</th>
             <th className="pb-3 pr-4 font-semibold">Customer</th>
             <th className="pb-3 pr-4 font-semibold">Booked</th>
-            <th className="pb-3 pr-4 font-semibold">Delivered</th>
+            <th className="pb-3 pr-4 font-semibold">Delivery date</th>
+            <th className="pb-3 pr-4 font-semibold">Status</th>
             <th className="pb-3 pr-4 text-right font-semibold">Order value</th>
             <th className="pb-3 text-right font-semibold">Profit</th>
           </tr></thead>
           <tbody className="divide-y divide-slate-100">
-            {deliveredOrders.map((order: { id: number; customer_name: string; booking_date: string; delivery_date: string; total: string; profit: string }) => <tr key={order.id}>
+            {supplierOrders.map((order: { id: number; customer_name: string; booking_date: string; delivery_date: string; total: string; profit: string | null; status: string }) => <tr key={order.id}>
               <td className="py-3 pr-4"><Link href={`/dashboard/orders?modal=details&order=${order.id}`} className="font-semibold text-slate-900 hover:text-amber-700">#{order.id}</Link></td>
               <td className="py-3 pr-4 text-slate-700">{order.customer_name}</td>
               <td className="py-3 pr-4 text-slate-600">{formatDateDDMMYY(order.booking_date)}</td>
               <td className="py-3 pr-4 text-slate-600">{formatDateDDMMYY(order.delivery_date)}</td>
+              <td className="py-3 pr-4 capitalize text-slate-700">{order.status}</td>
               <td className="py-3 pr-4 text-right font-medium text-slate-800">{currency(Number(order.total), currencyCode)}</td>
-              <td className="py-3 text-right font-semibold text-emerald-700">{currency(Number(order.profit), currencyCode)}</td>
+              <td className="py-3 text-right font-semibold text-emerald-700">{order.status !== "delivered" ? "—" : order.profit === null ? "Profit not added" : currency(Number(order.profit), currencyCode)}</td>
             </tr>)}
           </tbody>
         </table>
       </div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
-        <p className="font-semibold text-slate-800">No delivered orders yet</p>
-        <p className="mt-1 text-sm text-slate-500">Orders assigned to this supplier will appear here after delivery.</p>
+        <p className="font-semibold text-slate-800">No orders assigned yet</p>
+        <p className="mt-1 text-sm text-slate-500">Orders assigned to this supplier will appear here.</p>
       </div>}
     </Panel>
 
