@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { formatDateDDMMYY } from "@/lib/date-format";
+import { currency } from "@/lib/currency";
 
 type CopyOrder = {
+  csrName: string;
+  idName: string;
   bookingDate: string;
   deliveryDate: string;
   postcode: string;
@@ -17,30 +19,43 @@ type CopyOrder = {
   freeParking: boolean;
   total: number;
   paymentMethod: string;
-  description: string;
   imageUrl: string;
 };
 
+function formatCopyDate(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[2]}-${match[3]}-${match[1]}`;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  }).format(date).replaceAll("/", "-");
+}
+
 function buildOrderText(order: CopyOrder, currencyCode: string) {
   const lines = [
-    `Booking Date: ${formatDateDDMMYY(order.bookingDate)}`,
-    `Delivery Date: ${formatDateDDMMYY(order.deliveryDate)}`,
+    `CSR : ${order.csrName}`,
+    `ID Name : ${order.idName}`,
+    "",
+    `Booking Date :  ${formatCopyDate(order.bookingDate)}`,
+    `Delivery Date :  ${formatCopyDate(order.deliveryDate)}`,
     "",
     `Customer Name: ${order.customerName}`,
-    `Address: ${order.address}`,
-    `Postcode: ${order.postcode || "-"}`,
-    `Phone Number: ${order.phoneNumber}`,
-    `Order Details: ${order.orderDetails}`,
-    `Color: ${order.color}`,
-    `Price: ${currencyCode} ${order.price}`,
-    `Free delivery: ${order.freeDelivery ? "Yes" : "No"}`,
-    `Free parking available: ${order.freeParking ? "Yes" : "No"}`,
-    `Total: ${currencyCode} ${order.total} ${order.paymentMethod}`,
+    `Address 🏠: ${order.address}`,
+    `Postcode : ${order.postcode}`,
+    `Phone Number : ${order.phoneNumber}`,
+    `Order Details : ${order.orderDetails}`,
+    "",
+    `Color  : ${order.color}`,
+    `Price   : ${currency(order.price, currencyCode)}`,
+    `Free delivery  ${order.freeDelivery ? "✅" : "❌"}`,
+    `Free parking available ${order.freeParking ? "✅" : "❌"}`,
+    "---------------",
+    `Total: ${currency(order.total, currencyCode)} ${order.paymentMethod.replaceAll(" ", " ")}`,
   ];
-
-  if (order.description) {
-    lines.push(`Description: ${order.description}`);
-  }
 
   return lines.join("\n");
 }
