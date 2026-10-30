@@ -6,7 +6,7 @@ declare global {
   var __officeBootstrapVersion: number | undefined;
 }
 
-const DB_SCHEMA_VERSION = 9;
+const DB_SCHEMA_VERSION = 10;
 
 function getConnectionString() {
   const connectionString = process.env.DATABASE_URL;
@@ -361,6 +361,21 @@ async function bootstrap() {
       value text not null,
       updated_at timestamptz not null default now()
     );
+  `;
+
+  await sql`alter table finance_entries add column if not exists currency_code text not null default 'PKR'`;
+  await sql`alter table finance_entries add column if not exists exchange_rate numeric(14, 6) not null default 1`;
+  await sql`alter table finance_entries add column if not exists amount_pkr numeric(14, 2) not null default 0`;
+  await sql`
+    with migration as (
+      insert into app_settings (key, value)
+      values ('finance_currency_fields_v1', 'complete')
+      on conflict (key) do nothing
+      returning key
+    )
+    update finance_entries
+    set amount_pkr = amount, currency_code = 'PKR', exchange_rate = 1
+    where exists (select 1 from migration)
   `;
 
   await sql`alter table orders alter column profit drop default`;

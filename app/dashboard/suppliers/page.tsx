@@ -34,16 +34,39 @@ export default async function SuppliersPage({ searchParams }: { searchParams?: P
             <th className="pb-3 text-right font-semibold">Actions</th>
           </tr></thead>
           <tbody className="divide-y divide-slate-100">
-            {suppliers.map((supplier: SupplierListRow) => <tr key={supplier.id} className="hover:bg-slate-50/80">
-              <td className="py-3 pr-4"><Link href={`/dashboard/suppliers/${supplier.id}`} className="font-semibold text-slate-900 hover:text-amber-700">{supplier.name}</Link></td>
-              <td className="py-3 pr-4 text-slate-700">{supplier.company || "—"}</td>
-              <td className="py-3 pr-4 text-slate-700">{supplier.phone || "—"}</td>
-              <td className="max-w-sm whitespace-pre-wrap py-3 pr-4 text-slate-700">{supplier.address || "—"}</td>
-              <td className="py-3 text-right"><div className="inline-flex gap-2">
-                <Link href={`/dashboard/suppliers/${supplier.id}?modal=edit`} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100">Edit</Link>
-                <Link href={`/dashboard/suppliers/${supplier.id}?modal=delete`} className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50">Delete</Link>
-              </div></td>
-            </tr>)}
+            {suppliers.map((supplier: SupplierListRow) => {
+              const detailHref = `/dashboard/suppliers/${supplier.id}`;
+              return (
+                <tr key={supplier.id} className="group hover:bg-slate-50/80">
+                  <td className="p-0">
+                    <Link href={detailHref} className="block px-3 py-3 font-semibold text-slate-900 group-hover:text-amber-700">
+                      {supplier.name}
+                    </Link>
+                  </td>
+                  <td className="p-0">
+                    <Link href={detailHref} className="block px-3 py-3 text-slate-700">
+                      {supplier.company || "—"}
+                    </Link>
+                  </td>
+                  <td className="p-0">
+                    <Link href={detailHref} className="block px-3 py-3 text-slate-700">
+                      {supplier.phone || "—"}
+                    </Link>
+                  </td>
+                  <td className="max-w-sm p-0">
+                    <Link href={detailHref} className="block whitespace-pre-wrap px-3 py-3 text-slate-700">
+                      {supplier.address || "—"}
+                    </Link>
+                  </td>
+                  <td className="py-3 text-right">
+                    <div className="inline-flex gap-2">
+                      <Link href={`${detailHref}?modal=edit`} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100">Edit</Link>
+                      <Link href={`${detailHref}?modal=delete`} className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50">Delete</Link>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">

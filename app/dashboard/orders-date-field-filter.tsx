@@ -15,10 +15,11 @@ export function OrdersDateFieldFilter({ value }: { value: OrdersDateField }) {
 
   return (
     <label className="block min-w-0 text-sm font-medium text-slate-700">
-      Filter orders by
+      Filter by date
       <select value={value} onChange={(event) => updateDateField(event.target.value as OrdersDateField)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100">
         <option value="booking">Booking date</option>
         <option value="delivery">Delivery date</option>
+        <option value="either">Booking or delivery date</option>
       </select>
     </label>
   );

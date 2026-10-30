@@ -90,7 +90,7 @@ export function QuickDateFilter({
   }
 
   return (
-    <section aria-label="Filter orders by date" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <section aria-label="Filter by date range" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className={`grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 ${columnCount}`}>
           <label className="block text-sm font-medium text-slate-700">
             {labels?.preset ?? "Date range"}

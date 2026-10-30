@@ -12,6 +12,6 @@ export function getOrdersFilterKey(parts: OrdersFilterKeyParts) {
     period,
     isCustom ? parts.from || "" : "",
     isCustom ? parts.to || "" : "",
-    parts.dateField === "delivery" ? "delivery" : "booking",
+    parts.dateField === "either" ? "either" : parts.dateField === "delivery" ? "delivery" : "booking",
   ].join("|");
 }

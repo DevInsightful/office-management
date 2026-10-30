@@ -80,13 +80,13 @@ export function OrdersFilterResults({ children }: { children: ReactNode }) {
           <div className="flex h-fit items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-800 shadow-lg">
             {hasError ? (
               <>
-                <span>Orders are taking too long to load.</span>
-                <button type="button" onClick={retry} className="rounded-lg bg-slate-950 px-3 py-2 text-white hover:bg-slate-800">Reload orders</button>
+                <span>Results are taking too long to load.</span>
+                <button type="button" onClick={retry} className="rounded-lg bg-slate-950 px-3 py-2 text-white hover:bg-slate-800">Reload results</button>
               </>
             ) : (
               <>
                 <span aria-hidden="true" className="size-5 animate-spin rounded-full border-2 border-slate-200 border-t-amber-500" />
-                Loading orders for the selected filters…
+                Loading results for the selected filters…
               </>
             )}
           </div>

@@ -142,6 +142,9 @@ type FinanceEntry = {
   title: string;
   category: string;
   amount: number;
+  amountPkr: number;
+  currencyCode: "PKR" | "GBP" | "USD";
+  exchangeRate: number;
   entry_date: string;
   created_at: string;
   notes: string;
@@ -220,6 +223,8 @@ export function FinanceLedgerClient({
           entry.notes,
           entry.entry_date,
           entry.amount,
+          entry.currencyCode,
+          entry.amountPkr,
         );
         const matchesFrom = !activeRange.from || entry.entry_date >= activeRange.from;
         const matchesTo = !activeRange.to || entry.entry_date <= activeRange.to;
@@ -228,7 +233,7 @@ export function FinanceLedgerClient({
       })
       .sort((left, right) => {
         if (sort === "amount") {
-          return compareNumber(left.amount, right.amount, direction);
+          return compareNumber(left.amountPkr, right.amountPkr, direction);
         }
 
         const leftValue =
@@ -257,9 +262,9 @@ export function FinanceLedgerClient({
       filteredEntries.reduce(
         (acc, entry) => {
           if (entry.type === "income") {
-            acc.income += entry.amount;
+            acc.income += entry.amountPkr;
           } else {
-            acc.expense += entry.amount;
+            acc.expense += entry.amountPkr;
           }
 
           return acc;
@@ -353,7 +358,7 @@ export function FinanceLedgerClient({
                 <th className="pb-3 pr-4 font-medium"><SortButton label="Category" active={sort === "category"} direction={direction} onClick={() => toggleSort("category")} /></th>
                 <th className="pb-3 pr-4 font-medium"><SortButton label="Date" active={sort === "entry_date"} direction={direction} onClick={() => toggleSort("entry_date")} /></th>
                 <th className="pb-3 pr-4 font-medium">Created</th>
-                <th className="pb-3 pr-4 font-medium"><SortButton label="Amount" active={sort === "amount"} direction={direction} onClick={() => toggleSort("amount")} /></th>
+                <th className="pb-3 pr-4 font-medium"><SortButton label="Amount (PKR)" active={sort === "amount"} direction={direction} onClick={() => toggleSort("amount")} /></th>
                 <th className="pb-3 font-medium">Actions</th>
               </tr>
             </thead>
@@ -374,7 +379,12 @@ export function FinanceLedgerClient({
                     <td className="py-3 pr-4 text-slate-600">{entry.category}</td>
                     <td className="py-3 pr-4 text-slate-600">{entry.entry_date}</td>
                     <td className="py-3 pr-4 text-slate-600">{formatDateTime(entry.created_at)}</td>
-                    <td className="py-3 pr-4 font-semibold">{currency(entry.amount, currencyCode)}</td>
+                    <td className="py-3 pr-4 font-semibold">
+                      {currency(entry.amount, entry.currencyCode)}
+                      <span className="mt-1 block text-xs font-normal text-slate-500">
+                        {currency(entry.amountPkr, "PKR")} · rate {entry.exchangeRate}
+                      </span>
+                    </td>
                     <td className="py-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link

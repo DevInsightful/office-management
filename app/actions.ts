@@ -16,7 +16,7 @@ import { getAttendanceHoliday } from "@/lib/attendance-holidays";
 import { ensureDb, sql } from "@/lib/db";
 import { seedIfEmpty } from "@/lib/seed";
 import { SUPPORTED_CURRENCIES } from "@/lib/currency";
-import { setCurrencySetting } from "@/lib/settings";
+import { getFinanceExchangeRates, setCurrencySetting, setFinanceExchangeRates } from "@/lib/settings";
 import { getSupabaseBucket, getSupabaseClient } from "@/lib/supabase";
 import { findCsvColumnIndex } from "@/lib/csv";
 import { parseTabularFile } from "@/lib/spreadsheet";
@@ -49,6 +49,21 @@ export async function updateCurrencyAction(formData: FormData) {
 
   revalidatePath("/dashboard", "layout");
   redirect("/dashboard/settings?success=currency_updated");
+}
+
+export async function updateFinanceExchangeRatesAction(formData: FormData) {
+  await requireAdmin();
+
+  const gbpToPkr = cleanNumber(formData.get("gbpToPkr"));
+  const usdToPkr = cleanNumber(formData.get("usdToPkr"));
+  if (!Number.isFinite(gbpToPkr) || gbpToPkr <= 0 || !Number.isFinite(usdToPkr) || usdToPkr <= 0) {
+    redirect("/dashboard/finance?error=invalid_exchange_rates");
+  }
+
+  await setFinanceExchangeRates({ GBP: gbpToPkr, USD: usdToPkr });
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/finance");
+  redirect("/dashboard/finance?success=exchange_rates_updated");
 }
 
 export async function updateOwnProfileAction(formData: FormData) {
@@ -282,16 +297,21 @@ export async function addFinanceEntryAction(formData: FormData) {
   const title = cleanText(formData.get("title"));
   const category = cleanText(formData.get("category"));
   const amount = cleanNumber(formData.get("amount"));
+  const currencyCode = cleanText(formData.get("currency"));
   const entryDate = cleanDate(formData.get("entryDate"));
   const notes = cleanText(formData.get("notes"));
 
-  if (!title || !category || !amount || !["income", "expense"].includes(type)) {
-    redirect("/?error=invalid_finance_entry");
+  if (!title || !category || !Number.isFinite(amount) || amount <= 0 || !["income", "expense"].includes(type) || !["PKR", "GBP", "USD"].includes(currencyCode)) {
+    redirect("/dashboard/finance?error=invalid_finance_entry");
   }
 
+  const rates = await getFinanceExchangeRates();
+  const exchangeRate = currencyCode === "PKR" ? 1 : rates[currencyCode as "GBP" | "USD"];
+  if (exchangeRate === null) redirect("/dashboard/finance?error=exchange_rate_missing");
+  const amountPkr = Math.round(amount * exchangeRate * 100) / 100;
   await sql`
-    insert into finance_entries (type, title, category, amount, entry_date, notes, created_by)
-    values (${type}, ${title}, ${category}, ${amount}, ${entryDate}, ${notes}, ${actor.id})
+    insert into finance_entries (type, title, category, amount, currency_code, exchange_rate, amount_pkr, entry_date, notes, created_by)
+    values (${type}, ${title}, ${category}, ${amount}, ${currencyCode}, ${exchangeRate}, ${amountPkr}, ${entryDate}, ${notes}, ${actor.id})
   `;
 
   revalidatePath("/dashboard");
@@ -307,13 +327,27 @@ export async function updateFinanceEntryAction(formData: FormData) {
   const title = cleanText(formData.get("title"));
   const category = cleanText(formData.get("category"));
   const amount = cleanNumber(formData.get("amount"));
+  const currencyCode = cleanText(formData.get("currency"));
   const entryDate = cleanDate(formData.get("entryDate"));
   const notes = cleanText(formData.get("notes"));
 
-  if (!entryId || !title || !category || !amount || !["income", "expense"].includes(type)) {
+  if (!entryId || !title || !category || !Number.isFinite(amount) || amount <= 0 || !["income", "expense"].includes(type) || !["PKR", "GBP", "USD"].includes(currencyCode)) {
     redirect("/dashboard/finance?error=invalid_finance_entry");
   }
 
+  const currentRows = await sql<{ currency_code: string; exchange_rate: string }[]>`
+    select currency_code, exchange_rate::text from finance_entries where id=${entryId} limit 1
+  `;
+  const currentEntry = currentRows[0];
+  if (!currentEntry) redirect("/dashboard/finance?error=invalid_finance_entry");
+  const rates = await getFinanceExchangeRates();
+  const exchangeRate = currencyCode === currentEntry.currency_code
+    ? Number(currentEntry.exchange_rate)
+    : currencyCode === "PKR"
+      ? 1
+      : rates[currencyCode as "GBP" | "USD"];
+  if (exchangeRate === null) redirect("/dashboard/finance?error=exchange_rate_missing");
+  const amountPkr = Math.round(amount * exchangeRate * 100) / 100;
   await sql`
     update finance_entries
     set
@@ -321,6 +355,9 @@ export async function updateFinanceEntryAction(formData: FormData) {
       title = ${title},
       category = ${category},
       amount = ${amount},
+      currency_code = ${currencyCode},
+      exchange_rate = ${exchangeRate},
+      amount_pkr = ${amountPkr},
       entry_date = ${entryDate},
       notes = ${notes}
     where id = ${entryId}

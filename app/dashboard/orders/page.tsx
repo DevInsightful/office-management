@@ -30,7 +30,9 @@ export default async function OrdersPage({
   const dateRange = requestedPreset === "all"
     ? isValidDate(requestedRange.to) ? requestedRange : undefined
     : isValidDateRange(requestedRange.from, requestedRange.to) ? requestedRange : undefined;
-  const dateField = params?.dateField === "delivery" ? "delivery" : "booking";
+  const dateField = params?.dateField === "delivery" || params?.dateField === "either"
+    ? params.dateField
+    : "booking";
   const user = await requireUser();
   const data = await getOrdersData(user, dateRange, dateField);
   const canManageStatus = user.role !== "employee";

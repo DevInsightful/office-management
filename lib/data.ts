@@ -9,6 +9,7 @@ import { OFFICE_TIME_ZONE } from "@/lib/attendance-policy";
 export type DashboardData = {
   user: SessionUser;
   currency: CurrencyCode;
+  financeCurrency: "PKR";
   metrics: {
     income: number;
     expense: number;
@@ -29,6 +30,9 @@ export type DashboardData = {
       title: string;
       category: string;
       amount: number;
+      amountPkr: number;
+      currencyCode: "PKR" | "GBP" | "USD";
+      exchangeRate: number;
       entry_date: string;
       created_at: string;
       notes: string;
@@ -181,24 +185,24 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
   const [financeSummary, topIncomeCategories, topExpenseCategories, recentFinanceRows] =
     await Promise.all([
       sql<FinanceSummaryRow[]>`
-        select type, coalesce(sum(amount), 0)::text as total
+        select type, coalesce(sum(amount_pkr), 0)::text as total
         from finance_entries
         group by type
       `,
       sql<GroupedMoneyRow[]>`
-        select category, sum(amount)::text as total
+        select category, sum(amount_pkr)::text as total
         from finance_entries
         where type = 'income'
         group by category
-        order by sum(amount) desc
+        order by sum(amount_pkr) desc
         limit 5
       `,
       sql<GroupedMoneyRow[]>`
-        select category, sum(amount)::text as total
+        select category, sum(amount_pkr)::text as total
         from finance_entries
         where type = 'expense'
         group by category
-        order by sum(amount) desc
+        order by sum(amount_pkr) desc
         limit 5
       `,
       sql<{
@@ -207,11 +211,14 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
         title: string;
         category: string;
         amount: string;
+        amount_pkr: string;
+        currency_code: "PKR" | "GBP" | "USD";
+        exchange_rate: string;
         entry_date: string;
         created_at: string;
         notes: string;
       }[]>`
-        select id, type, title, category, amount::text, entry_date::text, created_at::text, notes
+        select id, type, title, category, amount::text, amount_pkr::text, currency_code, exchange_rate::text, entry_date::text, created_at::text, notes
         from finance_entries
         order by entry_date desc, id desc
       `,
@@ -445,6 +452,7 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
   return {
     user,
     currency: currencyCode,
+    financeCurrency: "PKR",
     metrics: {
       income: financeTotals.income,
       expense: financeTotals.expense,
@@ -454,10 +462,10 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
     },
     insights: {
       majorIncome: majorIncome
-        ? `${majorIncome.category} is the strongest income stream at ${currency(Number(majorIncome.total), currencyCode)}.`
+        ? `${majorIncome.category} is the strongest income stream at ${currency(Number(majorIncome.total), "PKR")}.`
         : "No income recorded yet.",
       majorExpense: majorExpense
-        ? `${majorExpense.category} is the highest expense bucket at ${currency(Number(majorExpense.total), currencyCode)}.`
+        ? `${majorExpense.category} is the highest expense bucket at ${currency(Number(majorExpense.total), "PKR")}.`
         : "No expenses recorded yet.",
       cutSuggestion: majorExpense
         ? `Review ${majorExpense.category}. It is the biggest cost center and should be audited first for possible cuts.`
@@ -473,12 +481,18 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
         title: string;
         category: string;
         amount: string;
+        amount_pkr: string;
+        currency_code: "PKR" | "GBP" | "USD";
+        exchange_rate: string;
         entry_date: string;
         created_at: string;
         notes: string;
       }) => ({
         ...row,
         amount: Number(row.amount),
+        amountPkr: Number(row.amount_pkr),
+        currencyCode: row.currency_code,
+        exchangeRate: Number(row.exchange_rate),
       })),
       incomeByCategory: topIncomeCategories.map((row: GroupedMoneyRow) => ({
         category: row.category,

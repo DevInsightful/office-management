@@ -12,7 +12,7 @@ export type OrderStatus =
   | "cancelled"
   | "delivered";
 
-export type OrdersDateField = "booking" | "delivery";
+export type OrdersDateField = "booking" | "delivery" | "either";
 
 type OrderRow = {
   id: number;
@@ -147,8 +147,31 @@ export async function getOrdersData(
           join users u on u.id = o.csr_user_id
           left join suppliers s on s.id = o.supplier_id
           where (${user.role !== "employee"} or o.csr_user_id = ${user.id})
-            and (${fromDate}::date is null or (case when ${dateField === "delivery"} then o.delivery_date else o.booking_date end) >= ${fromDate}::date)
-            and (${toDate}::date is null or (case when ${dateField === "delivery"} then o.delivery_date else o.booking_date end) <= ${toDate}::date)
+            and (
+              (
+                ${dateField === "booking"}
+                and (${fromDate}::date is null or o.booking_date >= ${fromDate}::date)
+                and (${toDate}::date is null or o.booking_date <= ${toDate}::date)
+              )
+              or (
+                ${dateField === "delivery"}
+                and (${fromDate}::date is null or o.delivery_date >= ${fromDate}::date)
+                and (${toDate}::date is null or o.delivery_date <= ${toDate}::date)
+              )
+              or (
+                ${dateField === "either"}
+                and (
+                  (
+                    (${fromDate}::date is null or o.booking_date >= ${fromDate}::date)
+                    and (${toDate}::date is null or o.booking_date <= ${toDate}::date)
+                  )
+                  or (
+                    (${fromDate}::date is null or o.delivery_date >= ${fromDate}::date)
+                    and (${toDate}::date is null or o.delivery_date <= ${toDate}::date)
+                  )
+                )
+              )
+            )
           order by o.created_at desc
         `;
 

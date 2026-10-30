@@ -7,34 +7,95 @@ import { ensureDb, sql } from "@/lib/db";
 import { getCurrencySetting } from "@/lib/settings";
 import Link from "next/link";
 import { formatDateDDMMYY } from "@/lib/date-format";
+import { OrdersFiltersClient } from "@/app/dashboard/orders-filters-client";
+import { getOrdersFilterKey } from "@/lib/orders-filter-key";
+import { getQuickDateRange, isValidDate, isValidDateRange, type QuickDatePreset } from "@/lib/quick-date-range";
 
 export default async function SupplierDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ supplierId: string }>;
-  searchParams?: Promise<{ modal?: string }>;
+  searchParams?: Promise<{ modal?: string; period?: string; from?: string; to?: string; dateField?: string }>;
 }) {
   await requireAdmin();
   await ensureDb();
   const { supplierId: rawId } = await params;
   const query = searchParams ? await searchParams : undefined;
+  const presets: QuickDatePreset[] = ["today", "this-week", "this-month", "last-month", "this-quarter", "this-year", "ytd", "all", "custom"];
+  const requestedPreset = presets.includes(query?.period as QuickDatePreset) ? query?.period as QuickDatePreset : "this-month";
+  const urlRange = { from: query?.from ?? "", to: query?.to ?? "" };
+  const requestedRange = requestedPreset === "custom"
+    ? urlRange
+    : requestedPreset === "all"
+      ? { from: "", to: getQuickDateRange("today").to }
+      : getQuickDateRange(requestedPreset);
+  const dateRange = requestedPreset === "all"
+    ? isValidDate(requestedRange.to) ? requestedRange : undefined
+    : isValidDateRange(requestedRange.from, requestedRange.to) ? requestedRange : undefined;
+  const dateField = query?.dateField === "delivery" || query?.dateField === "either"
+    ? query.dateField
+    : "booking";
+  const fromDate = dateRange?.from || null;
+  const toDate = dateRange?.to ?? null;
   const id = Number(rawId);
   if (!Number.isInteger(id) || id < 1) notFound();
   const suppliers = await sql<{ id: number; name: string; phone: string | null; company: string | null; address: string | null }[]>`select id, name, phone, company, address from suppliers where id=${id}`;
   const supplier = suppliers[0];
   if (!supplier) notFound();
-  const rows = await sql<{ total_orders: string; delivered: string; undelivered: string; month_delivered: string; profit: string; order_value: string }[]>`
+  const rows = await sql<{ total_orders: string; delivered: string; undelivered: string; profit: string; order_value: string }[]>`
     select count(*)::text total_orders,
       count(*) filter (where status='delivered')::text delivered,
       count(*) filter (where status <> 'delivered')::text undelivered,
-      count(*) filter (where status='delivered' and date_trunc('month', delivery_date)=date_trunc('month', current_date))::text month_delivered,
       coalesce(sum(profit),0)::text profit, coalesce(sum(total),0)::text order_value
-    from orders where supplier_id=${id}`;
+    from orders
+    where supplier_id=${id}
+      and (
+        (
+          ${dateField === "either"}
+          and (
+            (
+              (${fromDate}::date is null or booking_date >= ${fromDate}::date)
+              and (${toDate}::date is null or booking_date <= ${toDate}::date)
+            )
+            or (
+              (${fromDate}::date is null or delivery_date >= ${fromDate}::date)
+              and (${toDate}::date is null or delivery_date <= ${toDate}::date)
+            )
+          )
+        )
+        or (
+          ${dateField !== "either"}
+          and (${fromDate}::date is null or (case when ${dateField === "delivery"} then delivery_date else booking_date end) >= ${fromDate}::date)
+          and (${toDate}::date is null or (case when ${dateField === "delivery"} then delivery_date else booking_date end) <= ${toDate}::date)
+        )
+      )`;
   const stats = rows[0];
   const supplierOrders = await sql<{ id: number; customer_name: string; booking_date: string; delivery_date: string; total: string; profit: string | null; status: string }[]>`
     select id, customer_name, booking_date::text, delivery_date::text, total::text, profit::text, status
-    from orders where supplier_id=${id} order by delivery_date desc, id desc`;
+    from orders
+    where supplier_id=${id}
+      and (
+        (
+          ${dateField === "either"}
+          and (
+            (
+              (${fromDate}::date is null or booking_date >= ${fromDate}::date)
+              and (${toDate}::date is null or booking_date <= ${toDate}::date)
+            )
+            or (
+              (${fromDate}::date is null or delivery_date >= ${fromDate}::date)
+              and (${toDate}::date is null or delivery_date <= ${toDate}::date)
+            )
+          )
+        )
+        or (
+          ${dateField !== "either"}
+          and (${fromDate}::date is null or (case when ${dateField === "delivery"} then delivery_date else booking_date end) >= ${fromDate}::date)
+          and (${toDate}::date is null or (case when ${dateField === "delivery"} then delivery_date else booking_date end) <= ${toDate}::date)
+        )
+      )
+    order by delivery_date desc, id desc`;
   const currencyCode = await getCurrencySetting();
   const isEditModalOpen = query?.modal === "edit";
 
@@ -45,15 +106,6 @@ export default async function SupplierDetailPage({
       description={supplier.company ? `${supplier.company} · Supplier overview and order performance.` : "Supplier overview and order performance."}
       action={<div className="flex flex-wrap gap-2"><ActionLink href={`/dashboard/suppliers/${id}?modal=edit`} label="Edit supplier" /><ActionLink href={`/dashboard/suppliers/${id}?modal=delete`} label="Delete supplier" /></div>}
     />
-
-    <section aria-label="Supplier performance" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      <MetricCard label="Total Orders" value={stats.total_orders} tone="sky" />
-      <MetricCard label="Delivered" value={stats.delivered} tone="emerald" />
-      <MetricCard label="Undelivered" value={stats.undelivered} tone="amber" />
-      <MetricCard label="Delivered This Month" value={stats.month_delivered} tone="violet" />
-      <MetricCard label="Total Profit" value={currency(Number(stats.profit), currencyCode)} tone="emerald" />
-      <MetricCard label="Total Order Value" value={currency(Number(stats.order_value), currencyCode)} tone="sky" />
-    </section>
 
     <Panel title="Supplier details" subtitle="Contact information for this supplier.">
       <div className="grid gap-3 md:grid-cols-2">
@@ -75,6 +127,26 @@ export default async function SupplierDetailPage({
         </div>
       </div>
     </Panel>
+
+    <OrdersFiltersClient
+      initialPreset={requestedPreset}
+      initialFrom={query?.from}
+      initialTo={query?.to}
+      dateField={dateField}
+      activeKey={getOrdersFilterKey({
+        period: requestedPreset,
+        from: requestedPreset === "custom" ? query?.from : undefined,
+        to: requestedPreset === "custom" ? query?.to : undefined,
+        dateField,
+      })}
+    >
+      <section aria-label="Supplier performance" className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <MetricCard label="Total Orders" value={stats.total_orders} tone="sky" />
+        <MetricCard label="Delivered" value={stats.delivered} tone="emerald" />
+        <MetricCard label="Undelivered" value={stats.undelivered} tone="amber" />
+        <MetricCard label="Total Profit" value={currency(Number(stats.profit), currencyCode)} tone="emerald" />
+        <MetricCard label="Total Order Value" value={currency(Number(stats.order_value), currencyCode)} tone="sky" />
+      </section>
 
     <Panel title="Assigned orders" subtitle={`${supplierOrders.length} orders assigned to ${supplier.name}`}>
       {supplierOrders.length ? <div className="overflow-x-auto">
@@ -105,6 +177,7 @@ export default async function SupplierDetailPage({
         <p className="mt-1 text-sm text-slate-500">Orders assigned to this supplier will appear here.</p>
       </div>}
     </Panel>
+    </OrdersFiltersClient>
 
     {isEditModalOpen ? <ModalFrame title="Edit supplier" subtitle="Update this supplier’s contact information." closeHref={`/dashboard/suppliers/${id}`}>
       <form action={updateSupplierAction} className="space-y-3">
