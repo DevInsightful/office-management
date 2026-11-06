@@ -74,7 +74,7 @@ export default async function SuppliersPage() {
                   <th className="pb-3 pr-4">Total Orders</th>
                   <th className="pb-3 pr-4">Delivered (This Month)</th>
                   <th className="pb-3 pr-4">Undelivered (This Month)</th>
-                  <th className="pb-3 pr-4">Total Value</th>
+                  <th className="pb-3 pr-4">Remaining Commission</th>
                   <th className="pb-3">Total Profit</th>
                 </tr>
               </thead>
@@ -107,7 +107,7 @@ export default async function SuppliersPage() {
                         </span>
                       )}
                     </td>
-                    <td className="py-3 pr-4">{currency(supplier.totalOrderValue, currencyCode)}</td>
+                    <td className="py-3 pr-4 font-semibold text-rose-700">{currency(supplier.remainingCommission, currencyCode)}</td>
                     <td className="py-3 font-semibold text-emerald-700">
                       {currency(supplier.totalProfit, currencyCode)}
                     </td>

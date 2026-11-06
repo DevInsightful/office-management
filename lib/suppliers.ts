@@ -11,6 +11,7 @@ export type SupplierSummary = {
   undeliveredValueThisMonth: number;
   totalOrderValue: number;
   totalProfit: number;
+  remainingCommission: number;
 };
 
 type SupplierSummaryRow = {
@@ -24,6 +25,7 @@ type SupplierSummaryRow = {
   undelivered_value_this_month: string;
   total_order_value: string;
   total_profit: string;
+  remaining_commission: string;
 };
 
 export async function getSupplierSummaries(): Promise<SupplierSummary[]> {
@@ -56,7 +58,8 @@ export async function getSupplierSummaries(): Promise<SupplierSummary[]> {
           and o.delivery_date < (date_trunc('month', current_date) + interval '1 month')::date
       ), 0)::text as undelivered_value_this_month,
       coalesce(sum(o.total), 0)::text as total_order_value,
-      coalesce(sum(o.profit), 0)::text as total_profit
+      coalesce(sum(o.profit), 0)::text as total_profit,
+      coalesce(sum(o.profit) filter (where o.profit is not null and not o.profit_received), 0)::text as remaining_commission
     from suppliers s
     left join orders o on o.supplier_id = s.id
     group by s.id, s.name, s.phone, s.company, s.address
@@ -74,5 +77,6 @@ export async function getSupplierSummaries(): Promise<SupplierSummary[]> {
     undeliveredValueThisMonth: Number(row.undelivered_value_this_month),
     totalOrderValue: Number(row.total_order_value),
     totalProfit: Number(row.total_profit),
+    remainingCommission: Number(row.remaining_commission),
   }));
 }
