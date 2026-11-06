@@ -1035,13 +1035,17 @@ export async function updateOrderVendorFinanceAction(formData: FormData) {
   const supplierId = rawSupplierId ? Number(rawSupplierId) : null;
   const profitRaw = cleanText(formData.get("profit"));
   const profit = profitRaw ? Number(profitRaw) : null;
+  const profitReceived = formData.getAll("profitReceived").includes("true");
   if (!orderId || (rawSupplierId && (!Number.isInteger(supplierId) || Number(supplierId) < 1)) || (profit !== null && (!Number.isFinite(profit) || profit < 0))) {
     redirect(`/dashboard/orders?modal=details&order=${orderId}&error=invalid_vendor_finance`);
   }
-  const orderRows = await sql<{ status: string; total: string }[]>`select status, total::text from orders where id=${orderId} limit 1`;
+  const orderRows = await sql<{ status: string; total: string; existing_profit: string | null }[]>`select status, total::text, profit::text as existing_profit from orders where id=${orderId} limit 1`;
   const order = orderRows[0];
   if (!order || (profit !== null && order.status !== "delivered")) {
     redirect(`/dashboard/orders?modal=details&order=${orderId}&error=profit_requires_delivered`);
+  }
+  if (profitReceived && profit === null && order.existing_profit === null) {
+    redirect(`/dashboard/orders?modal=details&order=${orderId}&error=profit_required_for_received`);
   }
   if (profit !== null && profit > Number(order.total)) {
     redirect(`/dashboard/orders?modal=details&order=${orderId}&error=invalid_vendor_finance`);
@@ -1050,6 +1054,7 @@ export async function updateOrderVendorFinanceAction(formData: FormData) {
     update orders set
       supplier_id = ${supplierId},
       profit = coalesce(${profit}, profit),
+      profit_received = ${profitReceived},
       vendor_cost = case when ${profit}::numeric is null then vendor_cost else total - ${profit} end,
       updated_at = now()
     where id = ${orderId}

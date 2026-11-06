@@ -76,7 +76,7 @@ export default async function OrdersPage({
 
           <section aria-label="Order financial insights" className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <MetricCard label="Total Order Value" value={currency(data.metrics.totalOrderValue, data.currency)} tone="sky" />
-            <MetricCard label="Commission Earned" value={currency(data.metrics.commissionEarned, data.currency)} tone="emerald" />
+            {canManageStatus ? <MetricCard label="Profit Received" value={currency(data.metrics.profitReceived, data.currency)} tone="emerald" /> : null}
             {canManageStatus ? <MetricCard label="Total Profit" value={currency(data.metrics.totalProfit, data.currency)} tone="amber" /> : null}
           </section>
 
@@ -197,6 +197,11 @@ export default async function OrdersPage({
                 {selectedOrder.status === "delivered" ? <label className="text-sm font-medium text-slate-700">Profit
                   <input name="profit" type="number" min="0" step="0.01" defaultValue={selectedOrder.profit ?? ""} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
                 </label> : <p className="self-center text-sm text-slate-600">Profit can be entered after this order is delivered.</p>}
+                <label className="inline-flex items-center gap-3 self-center text-sm font-medium text-slate-700">
+                  <input type="hidden" name="profitReceived" value="false" />
+                  <input type="checkbox" name="profitReceived" value="true" defaultChecked={selectedOrder.profitReceived} disabled={selectedOrder.profit === null} className="size-4 accent-emerald-600 disabled:cursor-not-allowed disabled:opacity-40" />
+                  Profit received
+                </label>
               </div>
               <div className="mt-3 flex justify-end">
                 <PendingSubmitButton idleLabel="Save" pendingLabel="Saving..." className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800" pendingClassName="cursor-not-allowed bg-slate-700" />

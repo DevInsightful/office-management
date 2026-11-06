@@ -1,203 +1,124 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteSupplierAction, updateSupplierAction } from "@/app/actions";
-import { ActionLink, Field, MetricCard, ModalFrame, PageIntro, Panel, inputClass, primaryButton, currency } from "@/app/ui";
-import { PendingSubmitButton } from "@/app/pending-controls";
+
+import { ActionLink, MetricCard, PageIntro, Panel, currency } from "@/app/ui";
 import { requireAdmin } from "@/lib/auth";
 import { ensureDb, sql } from "@/lib/db";
-import { getCurrencySetting } from "@/lib/settings";
-import Link from "next/link";
 import { formatDateDDMMYY } from "@/lib/date-format";
-import { OrdersFiltersClient } from "@/app/dashboard/orders-filters-client";
-import { getOrdersFilterKey } from "@/lib/orders-filter-key";
-import { getQuickDateRange, isValidDate, isValidDateRange, type QuickDatePreset } from "@/lib/quick-date-range";
+import { getCurrencySetting } from "@/lib/settings";
+import { getSupplierSummaries } from "@/lib/suppliers";
 
-export default async function SupplierDetailPage({
+type SupplierOrder = {
+  id: number;
+  customer_name: string;
+  delivery_date: string;
+  total: string;
+  profit: string;
+  vendor_name: string;
+  note: string;
+  status: string;
+};
+
+export default async function SupplierDetailsPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ supplierId: string }>;
-  searchParams?: Promise<{ modal?: string; period?: string; from?: string; to?: string; dateField?: string }>;
 }) {
   await requireAdmin();
   await ensureDb();
-  const { supplierId: rawId } = await params;
-  const query = searchParams ? await searchParams : undefined;
-  const presets: QuickDatePreset[] = ["today", "this-week", "this-month", "last-month", "this-quarter", "this-year", "ytd", "all", "custom"];
-  const requestedPreset = presets.includes(query?.period as QuickDatePreset) ? query?.period as QuickDatePreset : "this-month";
-  const urlRange = { from: query?.from ?? "", to: query?.to ?? "" };
-  const requestedRange = requestedPreset === "custom"
-    ? urlRange
-    : requestedPreset === "all"
-      ? { from: "", to: getQuickDateRange("today").to }
-      : getQuickDateRange(requestedPreset);
-  const dateRange = requestedPreset === "all"
-    ? isValidDate(requestedRange.to) ? requestedRange : undefined
-    : isValidDateRange(requestedRange.from, requestedRange.to) ? requestedRange : undefined;
-  const dateField = query?.dateField === "delivery" || query?.dateField === "either"
-    ? query.dateField
-    : "booking";
-  const fromDate = dateRange?.from || null;
-  const toDate = dateRange?.to ?? null;
-  const id = Number(rawId);
-  if (!Number.isInteger(id) || id < 1) notFound();
-  const suppliers = await sql<{ id: number; name: string; phone: string | null; company: string | null; address: string | null }[]>`select id, name, phone, company, address from suppliers where id=${id}`;
-  const supplier = suppliers[0];
+
+  const supplierId = Number((await params).supplierId);
+  if (!Number.isInteger(supplierId) || supplierId <= 0) notFound();
+
+  const [summaries, currencyCode, orders] = await Promise.all([
+    getSupplierSummaries(),
+    getCurrencySetting(),
+    sql<SupplierOrder[]>`
+      select id, customer_name, delivery_date::text, total::text, profit::text, vendor_name, note, status
+      from orders
+      where supplier_id = ${supplierId}
+      order by delivery_date desc, id desc
+    `,
+  ]);
+
+  const supplier = summaries.find((item) => item.id === supplierId);
   if (!supplier) notFound();
-  const rows = await sql<{ total_orders: string; delivered: string; undelivered: string; profit: string; order_value: string }[]>`
-    select count(*)::text total_orders,
-      count(*) filter (where status='delivered')::text delivered,
-      count(*) filter (where status <> 'delivered')::text undelivered,
-      coalesce(sum(profit),0)::text profit, coalesce(sum(total),0)::text order_value
-    from orders
-    where supplier_id=${id}
-      and (
-        (
-          ${dateField === "either"}
-          and (
-            (
-              (${fromDate}::date is null or booking_date >= ${fromDate}::date)
-              and (${toDate}::date is null or booking_date <= ${toDate}::date)
-            )
-            or (
-              (${fromDate}::date is null or delivery_date >= ${fromDate}::date)
-              and (${toDate}::date is null or delivery_date <= ${toDate}::date)
-            )
-          )
-        )
-        or (
-          ${dateField !== "either"}
-          and (${fromDate}::date is null or (case when ${dateField === "delivery"} then delivery_date else booking_date end) >= ${fromDate}::date)
-          and (${toDate}::date is null or (case when ${dateField === "delivery"} then delivery_date else booking_date end) <= ${toDate}::date)
-        )
-      )`;
-  const stats = rows[0];
-  const supplierOrders = await sql<{ id: number; customer_name: string; booking_date: string; delivery_date: string; total: string; profit: string | null; status: string }[]>`
-    select id, customer_name, booking_date::text, delivery_date::text, total::text, profit::text, status
-    from orders
-    where supplier_id=${id}
-      and (
-        (
-          ${dateField === "either"}
-          and (
-            (
-              (${fromDate}::date is null or booking_date >= ${fromDate}::date)
-              and (${toDate}::date is null or booking_date <= ${toDate}::date)
-            )
-            or (
-              (${fromDate}::date is null or delivery_date >= ${fromDate}::date)
-              and (${toDate}::date is null or delivery_date <= ${toDate}::date)
-            )
-          )
-        )
-        or (
-          ${dateField !== "either"}
-          and (${fromDate}::date is null or (case when ${dateField === "delivery"} then delivery_date else booking_date end) >= ${fromDate}::date)
-          and (${toDate}::date is null or (case when ${dateField === "delivery"} then delivery_date else booking_date end) <= ${toDate}::date)
-        )
-      )
-    order by delivery_date desc, id desc`;
-  const currencyCode = await getCurrencySetting();
-  const isEditModalOpen = query?.modal === "edit";
 
-  return <div className="space-y-5">
-    <PageIntro
-      eyebrow="Supplier profile"
-      title={supplier.name}
-      description={supplier.company ? `${supplier.company} · Supplier overview and order performance.` : "Supplier overview and order performance."}
-      action={<div className="flex flex-wrap gap-2"><ActionLink href={`/dashboard/suppliers/${id}?modal=edit`} label="Edit supplier" /><ActionLink href={`/dashboard/suppliers/${id}?modal=delete`} label="Delete supplier" /></div>}
-    />
+  return (
+    <div className="space-y-4">
+      <PageIntro
+        eyebrow="Supplier"
+        title={supplier.name}
+        description={supplier.contactDetails || "No contact details have been recorded."}
+        action={<ActionLink href="/dashboard/suppliers" label="Back to Suppliers" />}
+      />
 
-    <Panel title="Supplier details" subtitle="Contact information for this supplier.">
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Supplier name</p>
-          <p className="mt-2 text-base font-semibold text-slate-950">{supplier.name}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Company</p>
-          <p className="mt-2 text-base font-semibold text-slate-950">{supplier.company || "Not provided"}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Phone</p>
-          <p className="mt-2 text-base font-semibold text-slate-950">{supplier.phone || "Not provided"}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 md:col-span-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Address</p>
-          <p className="mt-2 whitespace-pre-wrap text-base font-semibold text-slate-950">{supplier.address || "Not provided"}</p>
-        </div>
-      </div>
-    </Panel>
-
-    <OrdersFiltersClient
-      initialPreset={requestedPreset}
-      initialFrom={query?.from}
-      initialTo={query?.to}
-      dateField={dateField}
-      activeKey={getOrdersFilterKey({
-        period: requestedPreset,
-        from: requestedPreset === "custom" ? query?.from : undefined,
-        to: requestedPreset === "custom" ? query?.to : undefined,
-        dateField,
-      })}
-    >
-      <section aria-label="Supplier performance" className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <MetricCard label="Total Orders" value={stats.total_orders} tone="sky" />
-        <MetricCard label="Delivered" value={stats.delivered} tone="emerald" />
-        <MetricCard label="Undelivered" value={stats.undelivered} tone="amber" />
-        <MetricCard label="Total Profit" value={currency(Number(stats.profit), currencyCode)} tone="emerald" />
-        <MetricCard label="Total Order Value" value={currency(Number(stats.order_value), currencyCode)} tone="sky" />
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <MetricCard label="Total Orders" value={String(supplier.totalOrders)} tone="sky" />
+        <MetricCard
+          label="Delivered This Month"
+          value={`${supplier.deliveredThisMonth} (${currency(supplier.deliveredValueThisMonth, currencyCode)})`}
+          tone="emerald"
+        />
+        <MetricCard
+          label="Undelivered This Month"
+          value={`${supplier.undeliveredThisMonth} (${currency(supplier.undeliveredValueThisMonth, currencyCode)})`}
+          tone="rose"
+        />
+        <MetricCard label="Total Order Value" value={currency(supplier.totalOrderValue, currencyCode)} tone="violet" />
+        <MetricCard label="Total Profit" value={currency(supplier.totalProfit, currencyCode)} tone="amber" />
       </section>
 
-    <Panel title="Assigned orders" subtitle={`${supplierOrders.length} orders assigned to ${supplier.name}`}>
-      {supplierOrders.length ? <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="text-xs uppercase tracking-wide text-slate-500"><tr>
-            <th className="pb-3 pr-4 font-semibold">Order</th>
-            <th className="pb-3 pr-4 font-semibold">Customer</th>
-            <th className="pb-3 pr-4 font-semibold">Booked</th>
-            <th className="pb-3 pr-4 font-semibold">Delivery date</th>
-            <th className="pb-3 pr-4 font-semibold">Status</th>
-            <th className="pb-3 pr-4 text-right font-semibold">Order value</th>
-            <th className="pb-3 text-right font-semibold">Profit</th>
-          </tr></thead>
-          <tbody className="divide-y divide-slate-100">
-            {supplierOrders.map((order: { id: number; customer_name: string; booking_date: string; delivery_date: string; total: string; profit: string | null; status: string }) => <tr key={order.id}>
-              <td className="py-3 pr-4"><Link href={`/dashboard/orders?modal=details&order=${order.id}`} className="font-semibold text-slate-900 hover:text-amber-700">#{order.id}</Link></td>
-              <td className="py-3 pr-4 text-slate-700">{order.customer_name}</td>
-              <td className="py-3 pr-4 text-slate-600">{formatDateDDMMYY(order.booking_date)}</td>
-              <td className="py-3 pr-4 text-slate-600">{formatDateDDMMYY(order.delivery_date)}</td>
-              <td className="py-3 pr-4 capitalize text-slate-700">{order.status}</td>
-              <td className="py-3 pr-4 text-right font-medium text-slate-800">{currency(Number(order.total), currencyCode)}</td>
-              <td className="py-3 text-right font-semibold text-emerald-700">{order.status !== "delivered" ? "—" : order.profit === null ? "Profit not added" : currency(Number(order.profit), currencyCode)}</td>
-            </tr>)}
-          </tbody>
-        </table>
-      </div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
-        <p className="font-semibold text-slate-800">No orders assigned yet</p>
-        <p className="mt-1 text-sm text-slate-500">Orders assigned to this supplier will appear here.</p>
-      </div>}
-    </Panel>
-    </OrdersFiltersClient>
-
-    {isEditModalOpen ? <ModalFrame title="Edit supplier" subtitle="Update this supplier’s contact information." closeHref={`/dashboard/suppliers/${id}`}>
-      <form action={updateSupplierAction} className="space-y-3">
-        <input type="hidden" name="supplierId" value={id} />
-        <Field label="Supplier name"><input required name="name" defaultValue={supplier.name} className={inputClass} /></Field>
-        <Field label="Phone"><input name="phone" defaultValue={supplier.phone ?? ""} className={inputClass} /></Field>
-        <Field label="Company"><input name="company" defaultValue={supplier.company ?? ""} className={inputClass} /></Field>
-        <Field label="Address"><textarea name="address" rows={3} defaultValue={supplier.address ?? ""} className={inputClass} /></Field>
-        <button className={primaryButton}>Save changes</button>
-      </form>
-    </ModalFrame> : null}
-
-    {query?.modal === "delete" ? <ModalFrame title="Delete supplier?" subtitle="This supplier will be removed from your supplier list." closeHref={`/dashboard/suppliers/${id}`}>
-      <div className="space-y-4">
-        <p className="text-sm leading-6 text-slate-600">Orders already associated with {supplier.name} will remain in the system and become unassigned. Supplier contact details cannot be restored after deletion.</p>
-        <form action={deleteSupplierAction} className="flex flex-wrap justify-end gap-2">
-          <input type="hidden" name="supplierId" value={id} />
-          <PendingSubmitButton idleLabel="Delete supplier" pendingLabel="Deleting..." className="inline-flex items-center justify-center rounded-2xl bg-rose-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-800" pendingClassName="cursor-not-allowed bg-rose-400" />
-        </form>
-      </div>
-    </ModalFrame> : null}
-  </div>;
+      <Panel
+        title="Supplier Orders"
+        subtitle="Every order assigned to this supplier, including individual value, profit, delivering vendor, and notes."
+      >
+        {orders.length === 0 ? (
+          <p className="py-6 text-center text-sm text-slate-500">No orders assigned to this supplier yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="text-left text-slate-500">
+                <tr>
+                  <th className="pb-3 pr-4">Order</th>
+                  <th className="pb-3 pr-4">Customer</th>
+                  <th className="pb-3 pr-4">Delivery</th>
+                  <th className="pb-3 pr-4">Vendor</th>
+                  <th className="pb-3 pr-4">Notes</th>
+                  <th className="pb-3 pr-4">Status</th>
+                  <th className="pb-3 pr-4">Order Value</th>
+                  <th className="pb-3">Profit</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {(orders as SupplierOrder[]).map((order: SupplierOrder) => (
+                  <tr key={order.id}>
+                    <td className="py-3 pr-4 font-medium">
+                      <Link
+                        href={`/dashboard/orders?modal=details&order=${order.id}`}
+                        className="font-semibold text-slate-900 underline-offset-2 hover:text-amber-700 hover:underline"
+                      >
+                        #{order.id}
+                      </Link>
+                    </td>
+                    <td className="py-3 pr-4">{order.customer_name}</td>
+                    <td className="py-3 pr-4">{formatDateDDMMYY(order.delivery_date)}</td>
+                    <td className="py-3 pr-4">{order.vendor_name || "-"}</td>
+                    <td className="py-3 pr-4 max-w-xs truncate text-slate-600" title={order.note}>
+                      {order.note || "-"}
+                    </td>
+                    <td className="py-3 pr-4 capitalize">{order.status}</td>
+                    <td className="py-3 pr-4 font-medium">{currency(Number(order.total), currencyCode)}</td>
+                    <td className="py-3 font-semibold text-emerald-700">
+                      {currency(Number(order.profit), currencyCode)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
+    </div>
+  );
 }

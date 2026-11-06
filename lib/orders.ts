@@ -40,6 +40,7 @@ type OrderRow = {
   supplier_name: string | null;
   vendor_cost: string;
   profit: string | null;
+  profit_received: boolean;
   status: OrderStatus;
   created_at: string;
   updated_at: string;
@@ -58,6 +59,7 @@ export type OrdersData = {
     totalOrderValue: number;
     commissionEarned: number;
     totalProfit: number;
+    profitReceived: number;
   };
   orders: {
     id: number;
@@ -85,6 +87,7 @@ export type OrdersData = {
     supplierName: string | null;
     vendorCost: number;
     profit: number | null;
+    profitReceived: boolean;
     status: OrderStatus;
     createdAt: string;
     updatedAt: string;
@@ -137,6 +140,7 @@ export async function getOrdersData(
             s.name as supplier_name,
             o.vendor_cost::text,
             o.profit::text,
+            o.profit_received,
             o.status,
             o.created_at::text,
             o.updated_at::text,
@@ -201,6 +205,7 @@ export async function getOrdersData(
     supplierName: user.role === "employee" ? null : row.supplier_name,
     vendorCost: user.role === "employee" || row.profit === null ? 0 : Number(row.total) - Number(row.profit),
     profit: user.role === "employee" ? 0 : row.profit === null ? null : Number(row.profit),
+    profitReceived: user.role === "employee" ? false : row.profit_received,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -220,6 +225,10 @@ export async function getOrdersData(
       commissionEarned: orders.reduce((sum: number, order: OrderItem) => sum + order.commissionAmount, 0),
       totalProfit: orders.reduce(
         (sum: number, order: OrderItem) => sum + (order.profit ?? 0),
+        0,
+      ),
+      profitReceived: orders.reduce(
+        (sum: number, order: OrderItem) => sum + (order.profitReceived ? order.profit ?? 0 : 0),
         0,
       ),
     },
