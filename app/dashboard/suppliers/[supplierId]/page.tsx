@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ActionLink, MetricCard, PageIntro, Panel, currency } from "@/app/ui";
+import { SupplierCommissionCopyButton } from "@/app/dashboard/supplier-commission-copy-button";
 import { requireAdmin } from "@/lib/auth";
 import { ensureDb, sql } from "@/lib/db";
 import { formatDateDDMMYY } from "@/lib/date-format";
@@ -13,11 +14,13 @@ type SupplierOrder = {
   customer_name: string;
   delivery_date: string;
   total: string;
-  profit: string;
+  profit: string | null;
   profit_received: boolean;
   vendor_name: string;
   note: string;
   status: string;
+  postcode: string;
+  order_details: string;
 };
 
 export default async function SupplierDetailsPage({
@@ -35,7 +38,7 @@ export default async function SupplierDetailsPage({
     getSupplierSummaries(),
     getCurrencySetting(),
     sql<SupplierOrder[]>`
-      select id, customer_name, delivery_date::text, total::text, profit::text, profit_received, vendor_name, note, status
+      select id, customer_name, delivery_date::text, total::text, profit::text, profit_received, vendor_name, note, status, postcode, order_details
       from orders
       where supplier_id = ${supplierId}
       order by delivery_date desc, id desc
@@ -74,6 +77,19 @@ export default async function SupplierDetailsPage({
         title="Supplier Orders"
         subtitle="Every order assigned to this supplier, including individual value, profit, delivering vendor, and notes."
       >
+        <div className="mb-4 flex justify-end">
+          <SupplierCommissionCopyButton
+            currencyCode={currencyCode}
+            orders={orders
+              .filter((order) => order.profit !== null && !order.profit_received)
+              .map((order) => ({
+                postcode: order.postcode,
+                orderDetails: order.order_details,
+                total: Number(order.total),
+                commission: Number(order.profit),
+              }))}
+          />
+        </div>
         {orders.length === 0 ? (
           <p className="py-6 text-center text-sm text-slate-500">No orders assigned to this supplier yet.</p>
         ) : (
@@ -111,7 +127,7 @@ export default async function SupplierDetailsPage({
                     <td className="py-3 pr-4 capitalize">{order.status}</td>
                     <td className="py-3 pr-4 font-medium">{currency(Number(order.total), currencyCode)}</td>
                     <td className={`py-3 font-semibold ${order.profit_received ? "text-emerald-700" : "text-rose-700"}`}>
-                      {currency(Number(order.profit), currencyCode)}
+                      {order.profit === null ? "—" : currency(Number(order.profit), currencyCode)}
                     </td>
                   </tr>
                 ))}
