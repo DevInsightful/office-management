@@ -553,6 +553,7 @@ type OrderRow = {
   total: number;
   commissionAmount: number;
   profit: number | null;
+  profitReceived: boolean;
   status: string;
   imageUrl: string;
   createdAt: string;
@@ -696,12 +697,12 @@ export function OrdersTableClient({
                   <td className="py-3 pr-3 text-slate-600">{order.postcode || "-"}</td>
                   <td className="py-3 pr-3 font-semibold">{currency(order.total, currencyCode)}</td>
                   {canManageStatus ? (
-                    <td className="py-3 pr-3 font-semibold text-emerald-700">
-                      {order.status !== "delivered"
-                        ? "—"
-                        : order.profit === null
+                    <td className={`py-3 pr-3 font-semibold ${order.profitReceived ? "text-emerald-700" : order.profit !== null ? "text-rose-700" : "text-amber-700"}`}>
+                      {order.profit !== null
+                        ? currency(order.profit, currencyCode)
+                        : order.status === "delivered"
                           ? "Profit not added"
-                          : currency(order.profit, currencyCode)}
+                          : "—"}
                     </td>
                   ) : null}
                   <td className="py-3 pr-3">

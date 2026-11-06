@@ -145,7 +145,7 @@ export default async function OrdersPage({
               {canManageStatus ? <>
                 <p><span className="font-semibold text-slate-900">Vendor:</span> {selectedOrder.supplierName || "-"}</p>
                 <p><span className="font-semibold text-slate-900">Vendor Cost (calculated):</span> {selectedOrder.profit === null ? "—" : currency(selectedOrder.vendorCost, data.currency)}</p>
-                <p><span className="font-semibold text-slate-900">Profit:</span> {selectedOrder.status === "delivered" && selectedOrder.profit === null ? "Delivered but profit not added" : selectedOrder.profit === null ? "—" : currency(selectedOrder.profit, data.currency)}</p>
+                <p><span className="font-semibold text-slate-900">Profit:</span> <span className={selectedOrder.profitReceived ? "font-semibold text-emerald-700" : selectedOrder.profit !== null ? "font-semibold text-rose-700" : "text-amber-700"}>{selectedOrder.status === "delivered" && selectedOrder.profit === null ? "Delivered but profit not added" : selectedOrder.profit === null ? "—" : currency(selectedOrder.profit, data.currency)}</span></p>
               </> : null}
               <p><span className="font-semibold text-slate-900">Notes:</span> {selectedOrder.notes || "-"}</p>
               <p><span className="font-semibold text-slate-900">Notes:</span> {selectedOrder.notes || "-"}</p>

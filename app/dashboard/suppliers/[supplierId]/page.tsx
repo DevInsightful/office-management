@@ -14,6 +14,7 @@ type SupplierOrder = {
   delivery_date: string;
   total: string;
   profit: string;
+  profit_received: boolean;
   vendor_name: string;
   note: string;
   status: string;
@@ -34,7 +35,7 @@ export default async function SupplierDetailsPage({
     getSupplierSummaries(),
     getCurrencySetting(),
     sql<SupplierOrder[]>`
-      select id, customer_name, delivery_date::text, total::text, profit::text, vendor_name, note, status
+      select id, customer_name, delivery_date::text, total::text, profit::text, profit_received, vendor_name, note, status
       from orders
       where supplier_id = ${supplierId}
       order by delivery_date desc, id desc
@@ -109,7 +110,7 @@ export default async function SupplierDetailsPage({
                     </td>
                     <td className="py-3 pr-4 capitalize">{order.status}</td>
                     <td className="py-3 pr-4 font-medium">{currency(Number(order.total), currencyCode)}</td>
-                    <td className="py-3 font-semibold text-emerald-700">
+                    <td className={`py-3 font-semibold ${order.profit_received ? "text-emerald-700" : "text-rose-700"}`}>
                       {currency(Number(order.profit), currencyCode)}
                     </td>
                   </tr>
