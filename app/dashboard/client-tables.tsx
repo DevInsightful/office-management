@@ -681,7 +681,15 @@ export function OrdersTableClient({
                       openOrder(order.id);
                     }
                   }}
-                  className="cursor-pointer transition hover:bg-slate-50/80 focus:outline-none focus:ring-2 focus:ring-amber-300"
+                  className={`cursor-pointer transition ${
+                    order.status === "delivered"
+                      ? "bg-emerald-200 hover:bg-emerald-300"
+                      : order.status === "cancelled"
+                        ? "bg-rose-200 hover:bg-rose-300"
+                        : order.status === "pending"
+                          ? "bg-sky-200 hover:bg-sky-300"
+                          : "hover:bg-slate-50/80"
+                  } focus:outline-none focus:ring-2 focus:ring-amber-300`}
                 >
                   <td className="whitespace-nowrap py-3 pr-3 text-slate-600">{formatDateDDMMYY(order.bookingDate)}</td>
                   <td className="whitespace-nowrap py-3 pr-3 text-slate-600">{formatDateDDMMYY(order.deliveryDate)}</td>
