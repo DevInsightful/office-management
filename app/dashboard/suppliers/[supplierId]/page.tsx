@@ -34,15 +34,16 @@ export default async function SupplierDetailsPage({
   const supplierId = Number((await params).supplierId);
   if (!Number.isInteger(supplierId) || supplierId <= 0) notFound();
 
+  const ordersQuery: Promise<SupplierOrder[]> = sql`
+    select id, customer_name, delivery_date::text, total::text, profit::text, profit_received, vendor_name, note, status, postcode, order_details
+    from orders
+    where supplier_id = ${supplierId}
+    order by delivery_date desc, id desc
+  `;
   const [summaries, currencyCode, orders] = await Promise.all([
     getSupplierSummaries(),
     getCurrencySetting(),
-    sql<SupplierOrder[]>`
-      select id, customer_name, delivery_date::text, total::text, profit::text, profit_received, vendor_name, note, status, postcode, order_details
-      from orders
-      where supplier_id = ${supplierId}
-      order by delivery_date desc, id desc
-    `,
+    ordersQuery,
   ]);
 
   const supplier = summaries.find((item) => item.id === supplierId);
@@ -108,7 +109,7 @@ export default async function SupplierDetailsPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {(orders as SupplierOrder[]).map((order: SupplierOrder) => (
+                {orders.map((order) => (
                   <tr key={order.id}>
                     <td className="py-3 pr-4 font-medium">
                       <Link
