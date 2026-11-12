@@ -62,8 +62,8 @@ export function OrderOverviewFilters({
           <span>{selected.label}</span>
           <span className="flex flex-wrap items-center gap-3">
           <label htmlFor="order-period-filter" className="sr-only">Filter orders</label>
-          <select id="order-period-filter" value={filter} onChange={(event) => setFilter(event.target.value as FilterKey)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-400">
-            {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          <select id="order-period-filter" value={filter} onChange={(event) => setFilter(event.target.value as FilterKey)} style={{ fontSize: "12px", lineHeight: "16px", fontWeight: 500 }} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 outline-none focus:border-amber-400">
+            {options.map((option) => <option key={option.value} value={option.value} style={{ fontSize: "12px" }}>{option.label}</option>)}
           </select>
           <span className="text-sm font-normal text-slate-500">{filteredOrders.length} order(s)</span>
           </span>
