@@ -563,10 +563,14 @@ export function OrdersTableClient({
   orders,
   canManageStatus,
   currencyCode,
+  title = "All Orders",
+  subtitle = "Order list with row click details and instant status updates for managers.",
 }: {
   orders: OrderRow[];
   canManageStatus: boolean;
   currencyCode: string;
+  title?: React.ReactNode;
+  subtitle?: string;
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -649,7 +653,7 @@ export function OrdersTableClient({
         value={search}
         onChange={setSearch}
       />
-      <Panel title="All Orders" subtitle="Order list with row click details and instant status updates for managers.">
+      <Panel title={title} subtitle={subtitle}>
         <div className="max-w-full overflow-x-auto">
           <table className="table-fixed min-w-[1240px] text-sm">
             <thead className="text-left text-slate-500">
