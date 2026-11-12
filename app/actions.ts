@@ -31,6 +31,56 @@ function cleanNumber(value: FormDataEntryValue | null) {
   return Number(String(value ?? "0").trim());
 }
 
+export async function createSofaProductAction(formData: FormData) {
+  await requireAdmin();
+  const productName = cleanText(formData.get("productName"));
+  const priceInput = cleanText(formData.get("lastPrice"));
+  const lastPrice = priceInput ? Number(priceInput) : null;
+
+  if (!productName || productName.length > 120 || (lastPrice !== null && (!Number.isFinite(lastPrice) || lastPrice < 0))) {
+    redirect("/dashboard/pricing?error=invalid");
+  }
+
+  await ensureDb();
+  const existing = await sql<{ id: number }[]>`select id from sofa_products where lower(product_name) = lower(${productName}) limit 1`;
+  if (existing.length > 0) redirect("/dashboard/pricing?error=duplicate");
+
+  await sql`insert into sofa_products (product_name, last_price) values (${productName}, ${lastPrice})`;
+  revalidatePath("/dashboard/pricing");
+  redirect("/dashboard/pricing?success=created");
+}
+
+export async function updateSofaProductAction(formData: FormData) {
+  await requireAdmin();
+  const productId = Number(cleanText(formData.get("productId")));
+  const productName = cleanText(formData.get("productName"));
+  const priceInput = cleanText(formData.get("lastPrice"));
+  const lastPrice = priceInput ? Number(priceInput) : null;
+
+  if (!Number.isInteger(productId) || productId < 1 || !productName || productName.length > 120 || (lastPrice !== null && (!Number.isFinite(lastPrice) || lastPrice < 0))) {
+    redirect("/dashboard/pricing?error=invalid");
+  }
+
+  await ensureDb();
+  const existing = await sql<{ id: number }[]>`select id from sofa_products where lower(product_name) = lower(${productName}) and id <> ${productId} limit 1`;
+  if (existing.length > 0) redirect(`/dashboard/pricing?modal=edit&id=${productId}&error=duplicate`);
+
+  await sql`update sofa_products set product_name = ${productName}, last_price = ${lastPrice}, updated_at = now() where id = ${productId}`;
+  revalidatePath("/dashboard/pricing");
+  redirect("/dashboard/pricing?success=updated");
+}
+
+export async function deleteSofaProductAction(formData: FormData) {
+  await requireAdmin();
+  const productId = Number(cleanText(formData.get("productId")));
+  if (!Number.isInteger(productId) || productId < 1) redirect("/dashboard/pricing?error=invalid");
+
+  await ensureDb();
+  await sql`delete from sofa_products where id = ${productId}`;
+  revalidatePath("/dashboard/pricing");
+  redirect("/dashboard/pricing?success=deleted");
+}
+
 function cleanDate(value: FormDataEntryValue | null) {
   const parsed = cleanText(value);
   return parsed || getOfficeTodayIsoDate(new Date());

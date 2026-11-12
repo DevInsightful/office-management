@@ -6,7 +6,7 @@ declare global {
   var __officeBootstrapVersion: number | undefined;
 }
 
-const DB_SCHEMA_VERSION = 11;
+const DB_SCHEMA_VERSION = 12;
 
 function getConnectionString() {
   const connectionString = process.env.DATABASE_URL;
@@ -320,6 +320,20 @@ async function bootstrap() {
   await sql`alter table suppliers add column if not exists phone text`;
   await sql`alter table suppliers add column if not exists company text`;
   await sql`alter table suppliers add column if not exists address text`;
+  await sql`create table if not exists sofa_products (
+    id serial primary key,
+    product_name text not null unique,
+    last_price numeric(12, 2),
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+  )`;
+  await sql`create unique index if not exists sofa_products_product_name_lower_idx on sofa_products (lower(product_name))`;
+  await sql`insert into sofa_products (product_name) values
+    ('Verona'), ('Harrison'), ('Nicole'), ('Ashton'), ('Argos'), ('Dylan'), ('Lily'), ('Falcon'),
+    ('Aston'), ('Chesterfiled'), ('U shape bishop'), ('Mini U shape'), ('Lily U shape'), ('salone U shape'),
+    ('Elegance'), ('Alaska'), ('rio'), ('oakland'), ('recliner & variations'), ('ashwin'), ('dino'),
+    ('shannon'), ('sloane'), ('madrid'), ('Zinc'), ('malibu')
+    on conflict (product_name) do nothing`;
   await sql`alter table orders add column if not exists supplier_id integer references suppliers(id) on delete set null`;
   await sql`alter table orders add column if not exists notes text not null default ''`;
   await sql`alter table orders add column if not exists admin_notes text not null default ''`;
