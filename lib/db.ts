@@ -6,7 +6,7 @@ declare global {
   var __officeBootstrapVersion: number | undefined;
 }
 
-const DB_SCHEMA_VERSION = 12;
+const DB_SCHEMA_VERSION = 14;
 
 function getConnectionString() {
   const connectionString = process.env.DATABASE_URL;
@@ -334,6 +334,24 @@ async function bootstrap() {
     ('Elegance'), ('Alaska'), ('rio'), ('oakland'), ('recliner & variations'), ('ashwin'), ('dino'),
     ('shannon'), ('sloane'), ('madrid'), ('Zinc'), ('malibu')
     on conflict (product_name) do nothing`;
+  await sql`create table if not exists sofa_product_prices (
+    product_id integer not null references sofa_products(id) on delete cascade,
+    category text not null,
+    last_price numeric(12, 2),
+    dimensions text not null default '',
+    updated_at timestamptz not null default now(),
+    primary key (product_id, category)
+  )`;
+  await sql`alter table sofa_product_prices add column if not exists dimensions text not null default ''`;
+  await sql`insert into sofa_product_prices (product_id, category)
+    select product.id, category.name
+    from sofa_products product
+    cross join (values
+      ('L shape left hand sofa'), ('5 seater corner'), ('3 and 2 seater'), ('cuddle chair'),
+      ('L shape right hand sofa'), ('4 seater dual arm right hand'), ('4 seater dual arm left hand'),
+      ('2 seater'), ('3 seater'), ('U shape')
+    ) as category(name)
+    on conflict (product_id, category) do nothing`;
   await sql`alter table orders add column if not exists supplier_id integer references suppliers(id) on delete set null`;
   await sql`alter table orders add column if not exists notes text not null default ''`;
   await sql`alter table orders add column if not exists admin_notes text not null default ''`;

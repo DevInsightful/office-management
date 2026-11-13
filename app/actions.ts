@@ -22,6 +22,7 @@ import { findCsvColumnIndex } from "@/lib/csv";
 import { parseTabularFile } from "@/lib/spreadsheet";
 import { assertFacebookIdAccess } from "@/lib/facebook-ids";
 import { validateFacebookIdRow } from "@/lib/facebook-id-validation";
+import { SOFA_CATEGORIES } from "@/lib/sofa-categories";
 
 function cleanText(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
@@ -34,10 +35,10 @@ function cleanNumber(value: FormDataEntryValue | null) {
 export async function createSofaProductAction(formData: FormData) {
   await requireAdmin();
   const productName = cleanText(formData.get("productName"));
-  const priceInput = cleanText(formData.get("lastPrice"));
-  const lastPrice = priceInput ? Number(priceInput) : null;
+  const prices = SOFA_CATEGORIES.map((_, index) => cleanText(formData.get(`price_${index}`)));
+  const dimensions = SOFA_CATEGORIES.map((_, index) => cleanText(formData.get(`dimensions_${index}`)));
 
-  if (!productName || productName.length > 120 || (lastPrice !== null && (!Number.isFinite(lastPrice) || lastPrice < 0))) {
+  if (!productName || productName.length > 120 || prices.some((price) => price !== "" && (!Number.isFinite(Number(price)) || Number(price) < 0)) || dimensions.some((value) => value.length > 100)) {
     redirect("/dashboard/pricing?error=invalid");
   }
 
@@ -45,7 +46,13 @@ export async function createSofaProductAction(formData: FormData) {
   const existing = await sql<{ id: number }[]>`select id from sofa_products where lower(product_name) = lower(${productName}) limit 1`;
   if (existing.length > 0) redirect("/dashboard/pricing?error=duplicate");
 
-  await sql`insert into sofa_products (product_name, last_price) values (${productName}, ${lastPrice})`;
+  const inserted = await sql<{ id: number }[]>`insert into sofa_products (product_name) values (${productName}) returning id`;
+  const productId = inserted[0]?.id;
+  if (!productId) redirect("/dashboard/pricing?error=invalid");
+  for (const [index, category] of SOFA_CATEGORIES.entries()) {
+    const price = prices[index] ? Number(prices[index]) : null;
+    await sql`insert into sofa_product_prices (product_id, category, last_price, dimensions) values (${productId}, ${category}, ${price}, ${dimensions[index]}) on conflict (product_id, category) do update set last_price = excluded.last_price, dimensions = excluded.dimensions, updated_at = now()`;
+  }
   revalidatePath("/dashboard/pricing");
   redirect("/dashboard/pricing?success=created");
 }
@@ -54,10 +61,10 @@ export async function updateSofaProductAction(formData: FormData) {
   await requireAdmin();
   const productId = Number(cleanText(formData.get("productId")));
   const productName = cleanText(formData.get("productName"));
-  const priceInput = cleanText(formData.get("lastPrice"));
-  const lastPrice = priceInput ? Number(priceInput) : null;
+  const prices = SOFA_CATEGORIES.map((_, index) => cleanText(formData.get(`price_${index}`)));
+  const dimensions = SOFA_CATEGORIES.map((_, index) => cleanText(formData.get(`dimensions_${index}`)));
 
-  if (!Number.isInteger(productId) || productId < 1 || !productName || productName.length > 120 || (lastPrice !== null && (!Number.isFinite(lastPrice) || lastPrice < 0))) {
+  if (!Number.isInteger(productId) || productId < 1 || !productName || productName.length > 120 || prices.some((price) => price !== "" && (!Number.isFinite(Number(price)) || Number(price) < 0)) || dimensions.some((value) => value.length > 100)) {
     redirect("/dashboard/pricing?error=invalid");
   }
 
@@ -65,7 +72,11 @@ export async function updateSofaProductAction(formData: FormData) {
   const existing = await sql<{ id: number }[]>`select id from sofa_products where lower(product_name) = lower(${productName}) and id <> ${productId} limit 1`;
   if (existing.length > 0) redirect(`/dashboard/pricing?modal=edit&id=${productId}&error=duplicate`);
 
-  await sql`update sofa_products set product_name = ${productName}, last_price = ${lastPrice}, updated_at = now() where id = ${productId}`;
+  await sql`update sofa_products set product_name = ${productName}, updated_at = now() where id = ${productId}`;
+  for (const [index, category] of SOFA_CATEGORIES.entries()) {
+    const price = prices[index] ? Number(prices[index]) : null;
+    await sql`insert into sofa_product_prices (product_id, category, last_price, dimensions) values (${productId}, ${category}, ${price}, ${dimensions[index]}) on conflict (product_id, category) do update set last_price = excluded.last_price, dimensions = excluded.dimensions, updated_at = now()`;
+  }
   revalidatePath("/dashboard/pricing");
   redirect("/dashboard/pricing?success=updated");
 }
