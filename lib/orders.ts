@@ -54,7 +54,7 @@ export type OrdersData = {
   metrics: {
     totalOrders: number;
     completedOrders: number;
-    approvedOrders: number;
+    cancelledOrders: number;
     pendingOrders: number;
     totalOrderValue: number;
     commissionEarned: number;
@@ -219,7 +219,7 @@ export async function getOrdersData(
     metrics: {
       totalOrders: orders.length,
       completedOrders: orders.filter((order: OrderItem) => order.status === "delivered").length,
-      approvedOrders: orders.filter((order: OrderItem) => order.status === "approved").length,
+      cancelledOrders: orders.filter((order: OrderItem) => order.status === "cancelled").length,
       pendingOrders: orders.filter((order: OrderItem) => order.status === "pending").length,
       totalOrderValue: orders.reduce((sum: number, order: OrderItem) => sum + order.total, 0),
       commissionEarned: orders.reduce((sum: number, order: OrderItem) => sum + order.commissionAmount, 0),

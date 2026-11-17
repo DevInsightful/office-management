@@ -69,8 +69,8 @@ export default async function OrdersPage({
       >
           <section className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="Total Orders" value={String(data.metrics.totalOrders)} tone="sky" />
-            <MetricCard label="Completed Orders" value={String(data.metrics.completedOrders)} tone="emerald" />
-            <MetricCard label="Approved" value={String(data.metrics.approvedOrders)} tone="amber" />
+            <MetricCard label="Delivered" value={String(data.metrics.completedOrders)} tone="emerald" />
+            <MetricCard label="Cancelled" value={String(data.metrics.cancelledOrders)} tone="amber" />
             <MetricCard label="Pending" value={String(data.metrics.pendingOrders)} tone="violet" />
           </section>
 
