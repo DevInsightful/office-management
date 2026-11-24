@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { PendingSubmitButton } from "@/app/pending-controls";
 import { Field, inputClass, primaryButton, textareaClass } from "@/app/ui";
+import { OptimizedOrderImageInput } from "@/app/dashboard/optimized-order-image-input";
 
 type OrderFormValues = {
   id?: number;
@@ -23,6 +24,7 @@ type OrderFormValues = {
   freeParking?: boolean;
   paymentMethod?: string;
   description?: string;
+  imageUrl?: string;
   notes?: string;
   supplierId?: number | null;
 };
@@ -53,6 +55,7 @@ export function OrderForm({
       ? String(initialValues.deliveryPrice)
       : "",
   );
+  const [imageProcessing, setImageProcessing] = useState(false);
 
   const total = useMemo(() => {
     const basePrice = Number(price || "0");
@@ -61,7 +64,7 @@ export function OrderForm({
   }, [deliveryMode, deliveryPrice, price]);
 
   return (
-    <form action={action} className="space-y-3">
+    <form action={action} onSubmit={(event) => { if (imageProcessing) event.preventDefault(); }} className="space-y-3">
       {initialValues?.id ? <input type="hidden" name="orderId" value={initialValues.id} /> : null}
       <Field label="Note">
         <input name="note" defaultValue={initialValues?.note} placeholder="Delivery will be Wednesday" className={inputClass} />
@@ -184,10 +187,17 @@ export function OrderForm({
         </Field>
       </div>
       {requireImage ? (
-        <Field label="Image">
-          <input name="image" type="file" accept="image/*" className={inputClass} />
-        </Field>
+        <OptimizedOrderImageInput required onProcessingChange={setImageProcessing} />
+      ) : initialValues?.imageUrl ? (
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div>
+            <p className="mb-2 text-sm font-medium text-slate-700">Current order image</p>
+            <img src={initialValues.imageUrl} alt="Current order" className="max-h-56 rounded-xl border border-slate-200 object-contain" />
+          </div>
+          <OptimizedOrderImageInput onProcessingChange={setImageProcessing} />
+        </div>
       ) : null}
+      {imageProcessing ? <p role="status" className="text-sm font-medium text-amber-700">Please wait while the image is optimized.</p> : null}
       <Field label="Description (Optional)">
         <textarea name="description" rows={3} defaultValue={initialValues?.description} className={textareaClass} placeholder="Optional extra notes" />
       </Field>

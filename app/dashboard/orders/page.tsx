@@ -15,7 +15,7 @@ import { ensureDb, sql } from "@/lib/db";
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ modal?: string; order?: string; period?: string; from?: string; to?: string; dateField?: string }>;
+  searchParams?: Promise<{ modal?: string; order?: string; period?: string; from?: string; to?: string; dateField?: string; error?: string }>;
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const params = searchParams ? await searchParams : undefined;
@@ -54,6 +54,9 @@ export default async function OrdersPage({
         }
         action={<ActionLink href="/dashboard/orders?modal=create-order" label="Create Order" />}
       />
+
+      {params?.error === "image_upload_failed" ? <p role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">The image could not be uploaded. Please try again.</p> : null}
+      {params?.error === "image_too_large" ? <p role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">The optimized image must be 750 KB or smaller. Choose another image.</p> : null}
 
       <OrdersFiltersClient
           initialPreset={requestedPreset}
@@ -214,7 +217,7 @@ export default async function OrdersPage({
       {modal === "edit-order" && selectedOrder && (
         <ModalFrame
           title={`Edit Order #${selectedOrder.id}`}
-          subtitle="Update the order details. Image stays unchanged during edit."
+          subtitle="Update the order details and replace the image if needed."
           closeHref={`/dashboard/orders?modal=details&order=${selectedOrder.id}`}
         >
           <OrderForm
@@ -243,6 +246,7 @@ export default async function OrdersPage({
               freeParking: selectedOrder.freeParking,
               paymentMethod: selectedOrder.paymentMethod,
               description: selectedOrder.description,
+              imageUrl: selectedOrder.imageUrl,
               notes: selectedOrder.notes,
               supplierId: selectedOrder.supplierId,
             }}

@@ -1,4 +1,3 @@
-import { OrdersTableClient } from "@/app/dashboard/client-tables";
 import { PageIntro } from "@/app/ui";
 import { OrderOverviewFilters } from "@/app/dashboard/order-overview/order-overview-filters";
 import { requireUser } from "@/lib/auth";

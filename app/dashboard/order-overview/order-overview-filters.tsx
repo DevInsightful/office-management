@@ -5,12 +5,12 @@ import { OrdersTableClient } from "@/app/dashboard/client-tables";
 import type { OrdersData } from "@/lib/orders";
 
 type Order = OrdersData["orders"][number];
-type FilterKey = "today-booked" | "yesterday-booked" | "this-week-booked" | "today-delivery" | "tomorrow-delivery" | "this-week-delivery" | "yesterday-delivered" | "past-seven-delivered";
+type FilterKey = "today-booked" | "yesterday-booked" | "past-seven-booked" | "today-delivery" | "tomorrow-delivery" | "this-week-delivery" | "yesterday-delivered" | "past-seven-delivered";
 
 const options: { value: FilterKey; label: string }[] = [
   { value: "today-booked", label: "Today booked orders" },
   { value: "yesterday-booked", label: "Yesterday booked orders" },
-  { value: "this-week-booked", label: "Orders booked this week" },
+  { value: "past-seven-booked", label: "Orders booked in past 7 days" },
   { value: "today-delivery", label: "Deliveries today" },
   { value: "tomorrow-delivery", label: "Deliveries tomorrow" },
   { value: "this-week-delivery", label: "Deliveries this week" },
@@ -43,7 +43,7 @@ export function OrderOverviewFilters({
     switch (filter) {
       case "today-booked": return order.bookingDate === today;
       case "yesterday-booked": return order.bookingDate === yesterday;
-      case "this-week-booked": return order.bookingDate >= thisWeekStart && order.bookingDate <= today;
+      case "past-seven-booked": return order.bookingDate >= pastSevenDaysStart && order.bookingDate <= today;
       case "today-delivery": return order.deliveryDate === today;
       case "tomorrow-delivery": return order.deliveryDate === tomorrow;
       case "this-week-delivery": return order.deliveryDate >= thisWeekStart && order.deliveryDate <= shiftWeekEnd(today);

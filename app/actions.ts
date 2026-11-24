@@ -32,6 +32,8 @@ function cleanNumber(value: FormDataEntryValue | null) {
   return Number(String(value ?? "0").trim());
 }
 
+const MAX_ORDER_IMAGE_UPLOAD_BYTES = 750 * 1024;
+
 export async function createSofaProductAction(formData: FormData) {
   await requireAdmin();
   const productName = cleanText(formData.get("productName"));
@@ -906,6 +908,10 @@ export async function createOrderAction(formData: FormData) {
   const total = price + normalizedDeliveryPrice;
   const vendorCost = total;
 
+  if (image instanceof File && image.size > MAX_ORDER_IMAGE_UPLOAD_BYTES) {
+    redirect("/dashboard/orders?error=image_too_large");
+  }
+
   if (
     !note ||
     !idName ||
@@ -926,18 +932,21 @@ export async function createOrderAction(formData: FormData) {
     redirect("/dashboard/orders?error=invalid_order");
   }
 
-  const supabase = getSupabaseClient();
-  const bucket = getSupabaseBucket();
   const safeName = image.name.replace(/[^a-zA-Z0-9.\-_]/g, "-");
   const filePath = `orders/${actor.id}/${Date.now()}-${safeName}`;
 
-  const upload = await supabase.storage.from(bucket).upload(filePath, image, {
-    cacheControl: "3600",
-    upsert: false,
-    contentType: image.type || "application/octet-stream",
-  });
-
-  if (upload.error) {
+  let uploadFailed = false;
+  try {
+    const upload = await getSupabaseClient().storage.from(getSupabaseBucket()).upload(filePath, image, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: image.type || "application/octet-stream",
+    });
+    uploadFailed = Boolean(upload.error);
+  } catch {
+    uploadFailed = true;
+  }
+  if (uploadFailed) {
     redirect("/dashboard/orders?error=image_upload_failed");
   }
 
@@ -1146,11 +1155,16 @@ export async function updateOrderAction(formData: FormData) {
   const freeParking = cleanBoolean(formData.get("freeParking"));
   const paymentMethod = cleanText(formData.get("paymentMethod"));
   const description = cleanText(formData.get("description"));
+  const image = formData.get("image");
   const orderNotes = actor.role === "employee" ? null : cleanText(formData.get("notes"));
   const supplierId = cleanNumber(formData.get("supplierId")) || null;
   const normalizedFreeDelivery = deliveryMode === "paid" ? false : freeDelivery || deliveryMode === "free";
   const normalizedDeliveryPrice = normalizedFreeDelivery ? 0 : deliveryPrice;
   const total = price + normalizedDeliveryPrice;
+
+  if (image instanceof File && image.size > MAX_ORDER_IMAGE_UPLOAD_BYTES) {
+    redirect(`/dashboard/orders?modal=edit-order&order=${orderId}&error=image_too_large`);
+  }
 
   if (
     !orderId ||
@@ -1166,7 +1180,9 @@ export async function updateOrderAction(formData: FormData) {
     !price ||
     !paymentMethod ||
     !["free", "paid"].includes(deliveryMode) ||
-    (!normalizedFreeDelivery && normalizedDeliveryPrice <= 0)
+    (!normalizedFreeDelivery && normalizedDeliveryPrice <= 0) ||
+    (image !== null && !(image instanceof File)) ||
+    (image instanceof File && image.size > MAX_ORDER_IMAGE_UPLOAD_BYTES)
   ) {
     redirect(`/dashboard/orders?modal=edit-order&order=${orderId}&error=invalid_order`);
   }
@@ -1182,6 +1198,24 @@ export async function updateOrderAction(formData: FormData) {
 
   if (!order || (actor.role === "employee" && order.csr_user_id !== actor.id)) {
     redirect("/dashboard/orders?error=forbidden");
+  }
+
+  let replacementImagePath: string | null = null;
+  if (image instanceof File && image.size > 0) {
+    const safeName = image.name.replace(/[^a-zA-Z0-9.\-_]/g, "-");
+    replacementImagePath = `orders/${actor.id}/${Date.now()}-${safeName}`;
+    let uploadFailed = false;
+    try {
+      const upload = await getSupabaseClient().storage.from(getSupabaseBucket()).upload(replacementImagePath, image, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: image.type || "application/octet-stream",
+      });
+      uploadFailed = Boolean(upload.error);
+    } catch {
+      uploadFailed = true;
+    }
+    if (uploadFailed) redirect(`/dashboard/orders?modal=edit-order&order=${orderId}&error=image_upload_failed`);
   }
 
   await sql`
@@ -1205,6 +1239,7 @@ export async function updateOrderAction(formData: FormData) {
       vendor_cost = case when profit is null then vendor_cost else ${total} - profit end,
       payment_method = ${paymentMethod},
       description = ${description},
+      image_url = coalesce(${replacementImagePath}, image_url),
       notes = coalesce(${orderNotes}, notes),
       supplier_id = case when ${actor.role === "employee"} then supplier_id else ${supplierId} end,
       updated_at = now()

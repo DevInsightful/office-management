@@ -654,9 +654,9 @@ export function OrdersTableClient({
         onChange={setSearch}
       />
       <Panel title={title} subtitle={subtitle}>
-        <div className="max-w-full overflow-x-auto">
+        <div className="max-h-[70vh] max-w-full overflow-auto">
           <table className="table-fixed min-w-[1240px] text-sm">
-            <thead className="text-left text-slate-500">
+            <thead className="sticky top-0 z-20 bg-white text-left text-slate-500 shadow-sm">
               <tr>
                 <th className="w-[9%] pb-3 pr-3 font-medium"><SortButton label="Booking" active={sort === "bookingDate"} direction={direction} onClick={() => toggleSort("bookingDate")} /></th>
                 <th className="w-[9%] pb-3 pr-3 font-medium"><SortButton label="Delivery" active={sort === "deliveryDate"} direction={direction} onClick={() => toggleSort("deliveryDate")} /></th>
